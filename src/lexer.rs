@@ -1,10 +1,5 @@
 use std::fmt;
 
-pub const KEYWORDS: [&str; 16] = [
-    "and", "class", "else", "false", "fun", "for", "if", "nil", "or", "print", "return", "super",
-    "this", "true", "var", "while",
-];
-
 #[derive(Debug)]
 pub enum Token {
     EOF,
@@ -31,6 +26,10 @@ impl fmt::Display for Token {
 }
 
 pub fn scan(source: String) -> Vec<Token> {
+    let keywords = [
+        "and", "class", "else", "false", "fun", "for", "if", "nil", "or", "print", "return",
+        "super", "this", "true", "var", "while",
+    ];
     let mut chars = source.char_indices().peekable();
     let mut tokens = Vec::new();
     let mut line = 0;
@@ -104,7 +103,7 @@ pub fn scan(source: String) -> Vec<Token> {
                     .map(|(_, c)| c.to_string())
                     .collect();
                 let identifier = format!("{}{}", char, identifier.join(""));
-                if KEYWORDS.contains(&&identifier[..]) {
+                if keywords.contains(&&identifier[..]) {
                     Some(Token::KEYWORD(identifier, line as u32))
                 } else {
                     Some(Token::IDENTIFIER(identifier, line as u32))
