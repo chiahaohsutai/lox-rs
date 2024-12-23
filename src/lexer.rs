@@ -114,12 +114,12 @@ fn match_kw_or_identifier(
 }
 
 fn match_number(ch: char, chars: &mut Peekable<CharIndices>, line: &mut usize) -> Option<Token> {
-    let number: String = chars
-        .by_ref()
-        .take_while(|(_, c)| c.is_digit(10) || *c == '.')
-        .map(|(_, c)| c.to_string())
-        .collect();
-    let number = format!("{}{}", ch, number);
+    let mut number: Vec<char> = vec![];
+    while chars.peek().map(|(_, c)| c.is_numeric() || *c == '_').unwrap_or(false) {
+        let (_, c) = chars.next().unwrap();
+        number.push(c);
+    };
+    let number = format!("{}{}", ch, number.iter().collect::<String>());
     match number.parse::<f64>() {
         Ok(n) => Some(Token::NUM(n, *line)),
         Err(_) => Some(Token::INVALID(number, *line)),
@@ -137,7 +137,7 @@ pub fn scan(text: String) -> Vec<Token> {
             '+' | '-' | '*' | '/' => match_arithmetic_operator(ch, &mut line, &mut chars),
             '!' | '=' | '<' | '>' => match_logical_operator(ch, line, &mut chars),
             '"' => match_string_literal(&mut chars, line),
-            ' ' | '\t' | '\r' => match_whitespace(ch, &mut line),
+            ' ' | '\t' | '\r' | '\n' => match_whitespace(ch, &mut line),
             '0'..='9' => match_number(ch, &mut chars, &mut line),
             'a'..='z' | 'A'..='Z' | '_' => match_kw_or_identifier(ch, &mut chars, &mut line),
             _ => None,
@@ -146,4 +146,49 @@ pub fn scan(text: String) -> Vec<Token> {
     }
     tokens.push(Token::EOF(line));
     tokens
+}
+
+mod Test {
+    use super::*;
+
+    #[test]
+    fn test_scan() {
+        let text = "var x = 10;".to_string();
+        let tokens = scan(text);
+        assert_eq!(tokens.len(), 6);
+        assert_eq!(tokens[0], Token::KWD(Keyword::VAR, 0));
+        assert_eq!(tokens[1], Token::IDEN("x".to_string(), 0));
+        assert_eq!(tokens[2], Token::OPER(Operator::EQUAL, 0));
+        assert_eq!(tokens[3], Token::NUM(10.0, 0));
+        assert_eq!(tokens[4], Token::PUNC(Punctuation::SEMICOLON, 0));
+        assert_eq!(tokens[5], Token::EOF(0));
+    }
+
+    #[test]
+    fn test_scan_string() {
+        let text = r#""hello world""#.to_string();
+        let tokens = scan(text);
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::STR("hello world".to_string(), 0));
+        assert_eq!(tokens[1], Token::EOF(0));
+    }
+
+    #[test]
+    fn test_scan_newlines() {
+        let text = "\n\"hello world\"\n".to_string();
+        let tokens = scan(text);
+        print!("{:?}", tokens);
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::STR(String::from("hello world"), 1));
+        assert_eq!(tokens[1], Token::EOF(2));
+    }
+
+    #[test]
+    fn scan_invalid_string() {
+        let text = r#""hello world"#.to_string();
+        let tokens = scan(text);
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::INVALID("hello world".to_string(), 0));
+        assert_eq!(tokens[1], Token::EOF(0));
+    }
 }
