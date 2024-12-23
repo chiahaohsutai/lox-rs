@@ -1,4 +1,17 @@
-use crate::lexer::Token;
+use crate::tokens::Token;
+
+enum Expression {
+    EXPRESSION,
+    EQUALITY,
+    COMPARISON,
+    TERM,
+    UNARY,
+    PRIMARY(Box<Expression>),
+    NUMBER(f64),
+    STRING(String),
+    BOOLEAN(bool),
+    NIL(())
+}
 
 fn parse(text: String)  {
     
