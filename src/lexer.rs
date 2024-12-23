@@ -57,7 +57,7 @@ fn match_logical_operator(
 }
 
 fn match_comment(chars: &mut Peekable<CharIndices>, line: &mut usize) -> Option<Token> {
-    chars.by_ref().take_while(|(_, c)| {
+    let _ = chars.by_ref().take_while(|(_, c)| {
         if *c == '\n' {
             *line += 1;
         };

@@ -1,16 +1,24 @@
 use crate::tokens::Token;
 
-enum Expression {
-    EXPRESSION,
-    EQUALITY,
-    COMPARISON,
-    TERM,
-    UNARY,
-    PRIMARY(Box<Expression>),
-    NUMBER(f64),
-    STRING(String),
-    BOOLEAN(bool),
-    NIL(())
+enum Expr {
+    Binary(BinaryExpr),
+    UnaryExpr(UnaryExpr),
+    Literal(LiteralExpr),
+}
+
+struct BinaryExpr {
+    left: Box<Expr>,
+    operator: Token,
+    right: Box<Expr>,
+}
+
+struct UnaryExpr {
+    operator: Token,
+    right: Box<Expr>,
+}
+
+struct LiteralExpr {
+    value: Token,
 }
 
 fn parse(text: String)  {
