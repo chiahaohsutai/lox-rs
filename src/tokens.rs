@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     EOF(usize),
     NUM(f64, usize),
@@ -22,6 +23,7 @@ impl std::fmt::Display for Token {
         }
     }
 }
+#[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     IF,
     OR,
@@ -105,6 +107,7 @@ impl Keyword {
         }
     }
 }
+#[derive(Debug, Clone, PartialEq)]
 pub enum Punctuation {
     DOT,
     COMMA,
@@ -127,6 +130,7 @@ impl std::fmt::Display for Punctuation {
         }
     }
 }
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     BANG,
     LESS,
