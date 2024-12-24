@@ -1,6 +1,6 @@
-use lox_rs::parse;
+use lox_rs::interpret;
 
 fn main() {
     let code = "var a = 1;".to_string();
-    parse(code);
+    interpret(code);
 }

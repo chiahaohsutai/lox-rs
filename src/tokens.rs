@@ -23,7 +23,7 @@ impl std::fmt::Display for Token {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Keyword {
     IF,
     OR,
@@ -107,7 +107,7 @@ impl Keyword {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Punctuation {
     DOT,
     COMMA,
@@ -130,7 +130,7 @@ impl std::fmt::Display for Punctuation {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Operator {
     BANG,
     LESS,

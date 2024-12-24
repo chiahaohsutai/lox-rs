@@ -1,5 +1,5 @@
-use std::fmt::Display;
-use crate::tokens::{Token, Operator};
+use std::{fmt::Display, slice::Iter, iter::Peekable};
+use crate::tokens::{self, Keyword, Operator, Punctuation, Token};
 
 enum LiteralExpr {
     Expression(Box<Expr>),
@@ -8,6 +8,7 @@ enum LiteralExpr {
     Number(f64),
     Nil,
 }
+
 impl Display for LiteralExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -38,34 +39,115 @@ impl Display for Expr {
     }
 }
 
-fn parse(text: String)  {
-    
+fn parse(tokens: &Vec<Token>) -> Expr {
+    let tokens = tokens.iter().peekable();
+    expression(tokens).0
 }
 
-fn expression(tokens: Vec<Token>) {
-    equality(tokens);
+fn expression(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+   equality(tokens)
 }
 
-fn equality(tokens: Vec<Token>) {
-
+fn equality(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let (mut expr, mut tokens) = comparison(tokens);
+    while let Some(&Token::OPER(op, _)) = tokens.peek() {
+        match op {
+            Operator::EQUALEQ | Operator::BANGEQ => {
+                let _ = tokens.next();
+                let rhs = comparison(tokens);
+                expr = Expr::Binary(Box::new(expr), *op, Box::new(rhs.0));
+                tokens = rhs.1;
+            }
+            _ => break,
+        }
+    };
+    (expr, tokens)
 }
 
-fn comparison(tokens: Vec<Token>) {
-
+fn comparison(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let (mut expr, mut tokens) = term(tokens);
+    while let Some(&Token::OPER(op, _)) = tokens.peek() {
+        match op {
+            Operator::LESS | Operator::LESSEQ | Operator::GREATER | Operator::GREATEREQ => {
+                let _ = tokens.next();
+                let rhs = term(tokens);
+                expr = Expr::Binary(Box::new(expr), *op, Box::new(rhs.0));
+                tokens = rhs.1;
+            }
+            _ => break,
+        }
+    };
+    (expr, tokens)
 }
 
-fn term(tokens: Vec<Token>) {
-
+fn term(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let (mut expr, mut tokens) = factor(tokens);
+    while let Some(&Token::OPER(op, _)) = tokens.peek() {
+        match op {
+            Operator::PLUS | Operator::MINUS => {
+                let _ = tokens.next();
+                let rhs = factor(tokens);
+                expr = Expr::Binary(Box::new(expr), *op, Box::new(rhs.0));
+                tokens = rhs.1;
+            }
+            _ => break,
+        }
+    };
+    (expr, tokens)
 }
 
-fn factor(tokens: Vec<Token>) {
-
+fn factor(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let (mut expr, mut tokens) = unary(tokens);
+    while let Some(&Token::OPER(op, _)) = tokens.peek() {
+        match op {
+            Operator::STAR | Operator::SLASH => {
+                let _ = tokens.next();
+                let rhs = unary(tokens);
+                expr = Expr::Binary(Box::new(expr), *op, Box::new(rhs.0));
+                tokens = rhs.1;
+            }
+            _ => break,
+        }
+    };
+    (expr, tokens)
 }
 
-fn unary(tokens: Vec<Token>) {
-
+fn unary(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let mut tokens = tokens;
+    if let Some(&Token::OPER(op, _)) = tokens.peek() {
+        match op {
+            Operator::MINUS | Operator::BANG => {
+                let _ = tokens.next();
+                let (expr, tokens) = unary(tokens);
+                return (Expr::UnaryExpr(*op, Box::new(expr)), tokens);
+            }
+            _ => primary(tokens),
+        }
+    } else {
+        primary(tokens)
+    }
 }
 
-fn primary(tokens: Vec<Token>) {
-
+fn primary(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
+    let mut tokens = tokens;
+    if let Some(token) = tokens.next() {
+        match token {
+            tokens::Token::NUM(n, _) => (Expr::Literal(LiteralExpr::Number(*n)), tokens),
+            tokens::Token::STR(s, _) => (Expr::Literal(LiteralExpr::String(String::from(s))), tokens),
+            tokens::Token::KWD(Keyword::TRUE, _) => (Expr::Literal(LiteralExpr::Boolean(true)), tokens),
+            tokens::Token::KWD(Keyword::FALSE, _) => (Expr::Literal(LiteralExpr::Boolean(false)), tokens),
+            tokens::Token::KWD(Keyword::NIL, _) => (Expr::Literal(LiteralExpr::Nil), tokens),
+            tokens::Token::PUNC(Punctuation::LPAREN, _) => {
+                let (expr, mut tokens) = expression(tokens);
+                if let Some(Token::PUNC(Punctuation::RPAREN, _)) = tokens.peek() {
+                    return (Expr::Grouping(Box::new(expr)), tokens);
+                } else {
+                    panic!("Expected closing parenthesis"); // TODO: Better error handling
+                }
+            }
+            _ => panic!("Unexpected token"), // TODO: Better error handling
+        }
+    } else {
+        panic!("Unexpected end of input"); // TODO: Better error handling
+    }
 }
