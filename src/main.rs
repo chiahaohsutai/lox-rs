@@ -1,3 +1,6 @@
+use lox_rs::parse;
+
 fn main() {
-    println!("Hello, world!");
+    let code = "var a = 1;".to_string();
+    parse(code);
 }

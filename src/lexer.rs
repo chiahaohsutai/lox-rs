@@ -1,5 +1,5 @@
 use crate::tokens::{Keyword, Operator, Punctuation, Token};
-use std::{char, iter::Peekable, str::CharIndices};
+use std::{char, iter::Peekable, str::Chars};
 
 fn match_punctuation(ch: char, line: usize) -> Option<Token> {
     let token = match ch {
@@ -18,9 +18,9 @@ fn match_punctuation(ch: char, line: usize) -> Option<Token> {
 fn match_arithmetic_operator(
     ch: char,
     line: &mut usize,
-    chars: &mut Peekable<CharIndices>,
+    chars: &mut Peekable<Chars>,
 ) -> Option<Token> {
-    if ch == '/' && chars.peek().map(|(_, c)| *c == '/').unwrap_or(false) {
+    if ch == '/' && chars.peek().map(|c| *c == '/').unwrap_or(false) {
         return match_comment(chars, line);
     }
     let token = match ch {
@@ -36,9 +36,9 @@ fn match_arithmetic_operator(
 fn match_logical_operator(
     ch: char,
     line: usize,
-    chars: &mut Peekable<CharIndices>,
+    chars: &mut Peekable<Chars>,
 ) -> Option<Token> {
-    let binary = chars.peek().map(|(_, c)| *c == '=').unwrap_or(false);
+    let binary = chars.peek().map(|c| *c == '=').unwrap_or(false);
     if binary {
         chars.next();
     }
@@ -49,15 +49,15 @@ fn match_logical_operator(
         ('>', false) => Token::OPER(Operator::GREATER, line),
         ('<', true) => Token::OPER(Operator::LESSEQ, line),
         ('!', true) => Token::OPER(Operator::BANGEQ, line),
-        ('>', true) => Token::OPER(Operator::GREATER, line),
+        ('>', true) => Token::OPER(Operator::GREATEREQ, line),
         ('=', true) => Token::OPER(Operator::EQUALEQ, line),
         _ => return None,
     };
     Some(token)
 }
 
-fn match_comment(chars: &mut Peekable<CharIndices>, line: &mut usize) -> Option<Token> {
-    let _ = chars.by_ref().take_while(|(_, c)| {
+fn match_comment(chars: &mut Peekable<Chars>, line: &mut usize) -> Option<Token> {
+    let _ = chars.by_ref().take_while(|c| {
         if *c == '\n' {
             *line += 1;
         };
@@ -73,15 +73,15 @@ fn match_whitespace(ch: char, line: &mut usize) -> Option<Token> {
     None
 }
 
-fn match_string_literal(chars: &mut Peekable<CharIndices>, line: usize) -> Option<Token> {
+fn match_string_literal(chars: &mut Peekable<Chars>, line: usize) -> Option<Token> {
     let mut last = '\0';
     let string = chars
         .by_ref()
-        .take_while(|(_, c)| {
+        .take_while(|c| {
             last = *c;
             *c != '"'
         })
-        .map(|(_, c)| c)
+        .map(|c| c)
         .collect();
     if last != '"' {
         Some(Token::INVALID(string, line))
@@ -92,18 +92,18 @@ fn match_string_literal(chars: &mut Peekable<CharIndices>, line: usize) -> Optio
 
 fn match_kw_or_identifier(
     ch: char,
-    chars: &mut Peekable<CharIndices>,
+    chars: &mut Peekable<Chars>,
     line: &mut usize,
 ) -> Option<Token> {
     let string: String = chars
         .by_ref()
-        .take_while(|(_, c)| {
+        .take_while(|c| {
             if *c == '\n' {
                 *line += 1;
             };
             c.is_alphanumeric() || *c == '_'
         })
-        .map(|(_, c)| c.to_string())
+        .map(|c| c.to_string())
         .collect();
     let string = format!("{}{}", ch, string);
     if Keyword::list().contains(&string) {
@@ -113,10 +113,10 @@ fn match_kw_or_identifier(
     }
 }
 
-fn match_number(ch: char, chars: &mut Peekable<CharIndices>, line: &mut usize) -> Option<Token> {
+fn match_number(ch: char, chars: &mut Peekable<Chars>, line: &mut usize) -> Option<Token> {
     let mut number: Vec<char> = vec![];
-    while chars.peek().map(|(_, c)| c.is_numeric() || *c == '_').unwrap_or(false) {
-        let (_, c) = chars.next().unwrap();
+    while chars.peek().map(|c| c.is_numeric() || *c == '_').unwrap_or(false) {
+        let c = chars.next().unwrap();
         number.push(c);
     };
     let number = format!("{}{}", ch, number.iter().collect::<String>());
@@ -127,11 +127,11 @@ fn match_number(ch: char, chars: &mut Peekable<CharIndices>, line: &mut usize) -
 }
 
 pub fn scan(text: String) -> Vec<Token> {
-    let mut chars = text.char_indices().peekable();
+    let mut chars = text.chars().peekable();
     let mut tokens = vec![];
     let mut line = 0;
 
-    while let Some((idx, ch)) = chars.next() {
+    while let Some(ch) = chars.next() {
         let token = match ch {
             '(' | ')' | '{' | '}' | ',' | '.' | ';' => match_punctuation(ch, line),
             '+' | '-' | '*' | '/' => match_arithmetic_operator(ch, &mut line, &mut chars),
@@ -148,8 +148,10 @@ pub fn scan(text: String) -> Vec<Token> {
     tokens
 }
 
-mod Test {
-    use super::*;
+#[cfg(test)]
+mod test {
+    use super::scan;
+    use crate::tokens::{Keyword, Operator, Punctuation, Token};
 
     #[test]
     fn test_scan() {
