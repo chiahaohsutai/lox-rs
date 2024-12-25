@@ -1,6 +1,6 @@
 use lox_rs::interpret;
 
 fn main() {
-    let code = "var a = 1;".to_string();
+    let code = "1 + (1 + 2 - (1))".to_string();
     interpret(code);
 }

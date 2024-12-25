@@ -1,8 +1,8 @@
 use std::{fmt::Display, slice::Iter, iter::Peekable};
 use crate::tokens::{self, Keyword, Operator, Punctuation, Token};
 
-enum LiteralExpr {
-    Expression(Box<Expr>),
+#[derive(Debug)]
+pub enum LiteralExpr {
     String(String),
     Boolean(bool),
     Number(f64),
@@ -12,7 +12,6 @@ enum LiteralExpr {
 impl Display for LiteralExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Expression(expr) => write!(f, "{}", expr),
             Self::String(s) => write!(f, "{}", s),
             Self::Boolean(b) => write!(f, "{}", b),
             Self::Number(n) => write!(f, "{}", n),
@@ -21,7 +20,8 @@ impl Display for LiteralExpr {
     }
 }
 
-enum Expr {
+#[derive(Debug)]
+pub enum Expr {
     Binary(Box<Expr>, Operator, Box<Expr>),
     UnaryExpr(Operator, Box<Expr>),
     Grouping(Box<Expr>),
@@ -31,15 +31,15 @@ enum Expr {
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::Binary(left, op, right) => write!(f, "({} ({}) ({}))", op, left, right),
-            Self::UnaryExpr(op, expr) => write!(f, "({} ({}))", op, expr),
+            Self::Binary(left, op, right) => write!(f, "({} {} {})", op, left, right),
+            Self::UnaryExpr(op, expr) => write!(f, "({} {})", op, expr),
             Self::Grouping(expr) => write!(f, "(group {})", expr),
             Self::Literal(literal) => write!(f, "{}", literal),
         }
     }
 }
 
-fn parse(tokens: &Vec<Token>) -> Expr {
+pub fn parse(tokens: Vec<Token>) -> Expr {
     let tokens = tokens.iter().peekable();
     expression(tokens).0
 }
@@ -145,9 +145,35 @@ fn primary(tokens: Peekable<Iter<Token>>) -> (Expr, Peekable<Iter<Token>>) {
                     panic!("Expected closing parenthesis"); // TODO: Better error handling
                 }
             }
-            _ => panic!("Unexpected token"), // TODO: Better error handling
+            _ => panic!("Unexpected token {:?}", token), // TODO: Better error handling
         }
     } else {
         panic!("Unexpected end of input"); // TODO: Better error handling
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_expression() {
+        let tokens = vec![
+            crate::tokens::Token::NUM(1.0, 0),
+            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
+            crate::tokens::Token::NUM(2.0, 0),
+        ];
+        let ast = crate::parser::parse(tokens);
+        assert_eq!(format!("{}", ast), "(+ 1 2)");
+    }
+    #[test]
+    fn test_expression_with_parenthesis() {
+        let tokens = vec![
+            crate::tokens::Token::PUNC(crate::tokens::Punctuation::LPAREN, 0),
+            crate::tokens::Token::NUM(1.0, 0),
+            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
+            crate::tokens::Token::NUM(2.0, 0),
+            crate::tokens::Token::PUNC(crate::tokens::Punctuation::RPAREN, 0),
+        ];
+        let ast = crate::parser::parse(tokens);
+        assert_eq!(format!("{}", ast), "(group (+ 1 2))");
     }
 }

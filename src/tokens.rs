@@ -148,18 +148,18 @@ pub enum Operator {
 impl std::fmt::Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::BANG => write!(f, "OPERATOR[!]"),
-            Self::LESS => write!(f, "OPERATOR[<]"),
-            Self::PLUS => write!(f, "OPERATOR[+]"),
-            Self::STAR => write!(f, "OPERATOR[*]"),
-            Self::EQUAL => write!(f, "OPERATOR[=]"),
-            Self::SLASH => write!(f, "OPERATOR[/]"),
-            Self::MINUS => write!(f, "OPERATOR[-]"),
-            Self::LESSEQ => write!(f, "OPERATOR[<=]"),
-            Self::BANGEQ => write!(f, "OPERATOR[!=]"),
-            Self::GREATER => write!(f, "OPERATOR[>]"),
-            Self::EQUALEQ => write!(f, "OPERATOR[==]"),
-            Self::GREATEREQ => write!(f, "OPERATOR[>=]"),
+            Self::BANG => write!(f, "!"),
+            Self::LESS => write!(f, "<"),
+            Self::PLUS => write!(f, "+"),
+            Self::STAR => write!(f, "*"),
+            Self::EQUAL => write!(f, "="),
+            Self::SLASH => write!(f, "/"),
+            Self::MINUS => write!(f, "-"),
+            Self::LESSEQ => write!(f, "<="),
+            Self::BANGEQ => write!(f, "!="),
+            Self::GREATER => write!(f, ">"),
+            Self::EQUALEQ => write!(f, "=="),
+            Self::GREATEREQ => write!(f, ">="),
         }
     }
 }
