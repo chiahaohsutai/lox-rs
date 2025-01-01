@@ -1,7 +1,7 @@
 use std::{fmt::Display, slice::Iter, iter::Peekable, result::Result};
 use crate::tokens::{self, Keyword, Operator, Punctuation, Token};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LiteralExpr {
     String(String),
     Boolean(bool),
@@ -20,7 +20,7 @@ impl Display for LiteralExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expr {
     Binary(Box<Expr>, Operator, Box<Expr>),
     UnaryExpr(Operator, Box<Expr>),
@@ -140,12 +140,13 @@ fn primary(tokens: Peekable<Iter<Token>>) -> Result<(Expr, Peekable<Iter<Token>>
             tokens::Token::PUNC(Punctuation::LPAREN, _) => {
                 let (expr, mut tokens) = expression(tokens)?;
                 if let Some(Token::PUNC(Punctuation::RPAREN, _)) = tokens.peek() {
+                    let _ = tokens.next();
                     Ok((Expr::Grouping(Box::new(expr)), tokens))
                 } else {
                     Err(String::from("Expected closing parenthesis"))
                 }
             }
-            _ => Err(format!("Unexpected token {:?}", token)), // TODO: Better error handling
+            _ => Err(format!("Unexpected token {:?}", token)),
         }
     } else {
         Err(String::from("Unexpected end of input"))
@@ -188,5 +189,16 @@ mod test {
         ];
         let ast = crate::parser::parse(tokens).unwrap();
         assert_eq!(format!("{}", ast), "(+ 1 (* 2 (- 3)))");
+    }
+    #[test]
+    fn test_unterminated_parenthesis() {
+        let tokens = vec![
+            crate::tokens::Token::PUNC(crate::tokens::Punctuation::LPAREN, 0),
+            crate::tokens::Token::NUM(1.0, 0),
+            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
+            crate::tokens::Token::NUM(2.0, 0),
+        ];
+        let ast = crate::parser::parse(tokens);
+        assert_eq!(ast, Err(String::from("Expected closing parenthesis")));
     }
 }
