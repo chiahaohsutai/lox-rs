@@ -1,11 +1,12 @@
-use std::{fmt::Error, result::Result};
+use std::result::Result;
 use crate::{parser::{Expr, LiteralExpr}, tokens::Operator};
 
-enum Literal {
+pub enum Literal {
     Number(f32),
     Boolean(bool),
     String(String),
 }
+
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -16,7 +17,7 @@ impl std::fmt::Display for Literal {
     }
 }
 
-trait Evaluate {
+pub trait Evaluate {
     fn evaluate(self) -> Result<Option<Literal>, String>;
 }
 
@@ -130,11 +131,34 @@ fn evaluate_binary_expression(left: Box<Expr>, op: Operator, right: Box<Expr>) -
     }
 }
 
+fn evaluate_unary_expression(op: Operator, expression: Box<Expr>) -> Result<Option<Literal>, String> {
+    let expr = expression.evaluate()?;
+    match op {
+        Operator::MINUS => {
+            match expr {
+                Some(Literal::Number(n)) => Ok(Some(Literal::Number(-n))),
+                _ => Err(String::from("Invalid operand for - operator.")),
+            }
+        }
+        Operator::BANG => {
+            match expr {
+                Some(Literal::Boolean(b)) => Ok(Some(Literal::Boolean(!b))),
+                Some(Literal::String(s)) => Ok(Some(Literal::Boolean(s.is_empty()))),
+                Some(Literal::Number(n)) => Ok(Some(Literal::Boolean(n == 0.0))),
+                None => Ok(Some(Literal::Boolean(true))),
+            }
+        }
+        _ => Err(String::from("Found invalid operator in unary expresion.")),
+    }
+}
+
 impl Evaluate for Expr {
     fn evaluate(self) -> Result<Option<Literal>, String> {
         match self {
             Expr::Binary(left, op, right) => evaluate_binary_expression(left, op, right),
-            _ => todo!(),
+            Expr::UnaryExpr(op, expr) => evaluate_unary_expression(op, expr),
+            Expr::Grouping(expr) => expr.evaluate(),
+            Expr::Literal(literal) => literal.evaluate(),
         }
     }
 }
