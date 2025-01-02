@@ -153,6 +153,47 @@ fn primary(tokens: Peekable<Iter<Token>>) -> Result<(Expr, Peekable<Iter<Token>>
     }
 }
 
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
+pub fn parse_stmt(tokens: Vec<Token>) -> Result<Vec<Stmt>, String> {
+    let mut statements: Vec<Stmt> = vec![];
+    let mut tokens = tokens.iter().peekable();
+
+    while tokens.peek().is_some() {
+        let token = tokens.next().unwrap();
+        match token {
+            Token::EOF(_) => break,
+            _ => {
+                let (stmt, tkns) = statement(tokens)?;
+                statements.push(stmt);
+                tokens = tkns;
+            },
+        }
+    };
+    Ok(statements)
+}
+
+fn statement(mut tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
+    match tokens.next() {
+        Some(Token::KWD(Keyword::PRINT, _)) => print_stmt(tokens), 
+        Some(_) => todo!(),
+        None => todo!(),
+    }
+}
+
+fn print_stmt(mut tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
+    let (expr, mut tokens) = expression(tokens)?;
+    if let Some(Token::PUNC(Punctuation::SEMICOLON, _)) = tokens.peek() {
+        let _ = tokens.next();
+        Ok((Stmt::Print(expr), tokens))
+    } else {
+        Err(String::from("Expected semicolon"))
+    }
+}
+
 #[cfg(test)]
 mod test {
     #[test]
