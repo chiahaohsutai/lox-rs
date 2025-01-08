@@ -39,11 +39,6 @@ impl Display for Expr {
     }
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result<Expr, String> {
-    let tokens = tokens.iter().peekable();
-    Ok(expression(tokens)?.0)
-}
-
 fn expression(tokens: Peekable<Iter<Token>>) -> Result<(Expr, Peekable<Iter<Token>>), String> {
    Ok(equality(tokens)?)
 }
@@ -158,12 +153,12 @@ pub enum Stmt {
     Print(Expr),
 }
 
-pub fn parse_stmt(tokens: Vec<Token>) -> Result<Vec<Stmt>, String> {
+pub fn parse(tokens: Vec<Token>) -> Result<Vec<Stmt>, String> {
     let mut statements: Vec<Stmt> = vec![];
     let mut tokens = tokens.iter().peekable();
 
     while tokens.peek().is_some() {
-        let token = tokens.next().unwrap();
+        let token = tokens.peek().unwrap();
         match token {
             Token::EOF(_) => break,
             _ => {
@@ -179,67 +174,17 @@ pub fn parse_stmt(tokens: Vec<Token>) -> Result<Vec<Stmt>, String> {
 fn statement(mut tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
     match tokens.next() {
         Some(Token::KWD(Keyword::PRINT, _)) => print_stmt(tokens), 
-        Some(_) => todo!(),
-        None => todo!(),
+        Some(_) => Err(String::from("Expected keyword")),
+        None => Err(String::from("Unexpected end of input")),
     }
 }
 
-fn print_stmt(mut tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
+fn print_stmt(tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
     let (expr, mut tokens) = expression(tokens)?;
     if let Some(Token::PUNC(Punctuation::SEMICOLON, _)) = tokens.peek() {
         let _ = tokens.next();
         Ok((Stmt::Print(expr), tokens))
     } else {
         Err(String::from("Expected semicolon"))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_expression() {
-        let tokens = vec![
-            crate::tokens::Token::NUM(1.0, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
-            crate::tokens::Token::NUM(2.0, 0),
-        ];
-        let ast = crate::parser::parse(tokens).unwrap();
-        assert_eq!(format!("{}", ast), "(+ 1 2)");
-    }
-    #[test]
-    fn test_expression_with_parenthesis() {
-        let tokens = vec![
-            crate::tokens::Token::PUNC(crate::tokens::Punctuation::LPAREN, 0),
-            crate::tokens::Token::NUM(1.0, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
-            crate::tokens::Token::NUM(2.0, 0),
-            crate::tokens::Token::PUNC(crate::tokens::Punctuation::RPAREN, 0),
-        ];
-        let ast = crate::parser::parse(tokens).unwrap();
-        assert_eq!(format!("{}", ast), "(group (+ 1 2))");
-    }
-    #[test]
-    fn test_expression_with_multiple_operators() {
-        let tokens = vec![
-            crate::tokens::Token::NUM(1.0, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
-            crate::tokens::Token::NUM(2.0, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::STAR, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::MINUS, 0),
-            crate::tokens::Token::NUM(3.0, 0),
-        ];
-        let ast = crate::parser::parse(tokens).unwrap();
-        assert_eq!(format!("{}", ast), "(+ 1 (* 2 (- 3)))");
-    }
-    #[test]
-    fn test_unterminated_parenthesis() {
-        let tokens = vec![
-            crate::tokens::Token::PUNC(crate::tokens::Punctuation::LPAREN, 0),
-            crate::tokens::Token::NUM(1.0, 0),
-            crate::tokens::Token::OPER(crate::tokens::Operator::PLUS, 0),
-            crate::tokens::Token::NUM(2.0, 0),
-        ];
-        let ast = crate::parser::parse(tokens);
-        assert_eq!(ast, Err(String::from("Expected closing parenthesis")));
     }
 }

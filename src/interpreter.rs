@@ -1,5 +1,5 @@
 use std::result::Result;
-use crate::{parser::{Expr, LiteralExpr}, tokens::Operator};
+use crate::{parser::{Expr, LiteralExpr, Stmt}, tokens::Operator};
 
 pub enum Literal {
     Number(f32),
@@ -159,6 +159,19 @@ impl Evaluate for Expr {
             Expr::UnaryExpr(op, expr) => evaluate_unary_expression(op, expr),
             Expr::Grouping(expr) => expr.evaluate(),
             Expr::Literal(literal) => literal.evaluate(),
+        }
+    }
+}
+
+impl Evaluate for Stmt {
+    fn evaluate(self) -> Result<Option<Literal>, String> {
+        match self {
+            Stmt::Expression(expr) => expr.evaluate(),
+            Stmt::Print(expr) => {
+                let result = expr.evaluate()?;
+                println!("{}", result.unwrap());
+                Ok(None)
+            }
         }
     }
 }
