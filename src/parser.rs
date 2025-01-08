@@ -172,9 +172,12 @@ pub fn parse(tokens: Vec<Token>) -> Result<Vec<Stmt>, String> {
 }
 
 fn statement(mut tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
-    match tokens.next() {
-        Some(Token::KWD(Keyword::PRINT, _)) => print_stmt(tokens), 
-        Some(_) => Err(String::from("Expected keyword")),
+    match tokens.peek() {
+        Some(Token::KWD(Keyword::PRINT, _)) => {
+            let _ = tokens.next();
+            print_stmt(tokens)
+        }, 
+        Some(_) => expr_stmt(tokens),
         None => Err(String::from("Unexpected end of input")),
     }
 }
@@ -184,6 +187,16 @@ fn print_stmt(tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Toke
     if let Some(Token::PUNC(Punctuation::SEMICOLON, _)) = tokens.peek() {
         let _ = tokens.next();
         Ok((Stmt::Print(expr), tokens))
+    } else {
+        Err(String::from("Expected semicolon"))
+    }
+}
+
+fn expr_stmt(tokens: Peekable<Iter<Token>>) -> Result<(Stmt, Peekable<Iter<Token>>), String> {
+    let (expr, mut tokens) = expression(tokens)?;
+    if let Some(Token::PUNC(Punctuation::SEMICOLON, _)) = tokens.peek() {
+        let _ = tokens.next();
+        Ok((Stmt::Expression(expr), tokens))
     } else {
         Err(String::from("Expected semicolon"))
     }

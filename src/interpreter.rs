@@ -166,7 +166,10 @@ impl Evaluate for Expr {
 impl Evaluate for Stmt {
     fn evaluate(self) -> Result<Option<Literal>, String> {
         match self {
-            Stmt::Expression(expr) => expr.evaluate(),
+            Stmt::Expression(expr) => {
+                let _ = expr.evaluate();
+                Ok(None)
+            },
             Stmt::Print(expr) => {
                 let result = expr.evaluate()?;
                 println!("{}", result.unwrap());
