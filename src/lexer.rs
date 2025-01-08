@@ -90,22 +90,12 @@ fn match_string_literal(chars: &mut Peekable<Chars>, line: usize) -> Option<Toke
     }
 }
 
-fn match_kw_or_identifier(
-    ch: char,
-    chars: &mut Peekable<Chars>,
-    line: &mut usize,
-) -> Option<Token> {
-    let string: String = chars
-        .by_ref()
-        .take_while(|c| {
-            if *c == '\n' {
-                *line += 1;
-            };
-            c.is_alphanumeric() || *c == '_'
-        })
-        .map(|c| c.to_string())
-        .collect();
-    let string = format!("{}{}", ch, string);
+fn match_kw_or_identifier(ch: char, chars: &mut Peekable<Chars>, line: &mut usize) -> Option<Token> {
+    let mut string: String = ch.to_string();
+    while chars.peek().map(|c| c.is_alphanumeric() || *c == '_').unwrap_or(false) {
+        let c = chars.next().unwrap();
+        string.push(c);
+    };
     if Keyword::list().contains(&string) {
         Keyword::new(string).and_then(|kw| Some(Token::KWD(kw, *line)))
     } else {
