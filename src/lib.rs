@@ -3,8 +3,6 @@ mod lexer;
 mod parser;
 mod tokens;
 
-use parser::Declaration;
-
 use crate::interpreter::Evaluate;
 
 pub fn interpret<T: AsRef<str>>(text: T) {

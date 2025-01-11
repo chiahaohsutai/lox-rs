@@ -1,6 +1,6 @@
 use crate::tokens::{self, Keyword, Operator, Punctuation, Token};
 use std::{
-    fmt::{DebugList, Display},
+    fmt::Display,
     iter::Peekable,
     result::Result,
     slice::Iter,
