@@ -2,6 +2,8 @@ mod interpreter;
 mod lexer;
 mod parser;
 mod tokens;
+mod tokenizer;
+mod utils;
 
 use crate::interpreter::Evaluate;
 
