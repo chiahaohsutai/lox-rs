@@ -60,10 +60,15 @@ pub enum Operator {
 }
 
 fn tokenize_string_literal(program: &mut VecDeque<char>) -> Result<Token, String> {
+    let mut chars: Vec<String> = vec![];
     while let Some(char) = program.front() {
-        todo!()
-    }
-    Err(String::from("Not implemented."))
+        if char == &'"' {
+            return Ok(Token::STRING(chars.join("")));
+        } else {
+            chars.push(char.to_string());
+        }
+    };
+    Err(format!("Unterminated string: {}", chars.join("")))
 }
 
 pub fn tokenize(program: &str) -> Vec<Result<Token, String>> {
@@ -113,7 +118,7 @@ pub fn tokenize(program: &str) -> Vec<Result<Token, String>> {
             program.pop_front();
         };
         token.map(|token| tokens.push(token));
-    };
+    }
     tokens.push(Ok(Token::EOF));
     tokens
 }
