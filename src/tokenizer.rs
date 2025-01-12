@@ -59,23 +59,28 @@ pub enum Operator {
     GREATEREQ,
 }
 
-fn tokenize_string_literal(program: &mut VecDeque<char>) -> Result<Token, String> {
+fn tokenize_string(program: &mut VecDeque<(usize, char)>) -> Result<Token, String> {
     let mut chars: Vec<String> = vec![];
-    while let Some(char) = program.front() {
+    while let Some((_, char)) = program.front() {
         if char == &'"' {
             return Ok(Token::STRING(chars.join("")));
         } else {
             chars.push(char.to_string());
+            program.pop_front();
         }
     };
     Err(format!("Unterminated string: {}", chars.join("")))
 }
 
+fn tokenize_number(program: &mut VecDeque<(usize, char)>) -> Result<Token, String> {
+    todo!();
+}
+
 pub fn tokenize(program: &str) -> Vec<Result<Token, String>> {
-    let mut program: VecDeque<char> = program.chars().collect();
+    let mut program: VecDeque<(usize, char)> = program.chars().enumerate().collect();
     let mut tokens: Vec<Result<Token, String>> = vec![];
 
-    while let Some(char) = program.pop_front() {
+    while let Some((i, char)) = program.front() {
         let token = match char {
             '(' => Some(Ok(Token::PUNCTUATION(Punctuation::LPAREN))),
             ')' => Some(Ok(Token::PUNCTUATION(Punctuation::RPAREN))),
@@ -89,32 +94,34 @@ pub fn tokenize(program: &str) -> Vec<Result<Token, String>> {
             '*' => Some(Ok(Token::OPERATOR(Operator::STAR))),
             '/' => Some(Ok(Token::OPERATOR(Operator::SLASH))),
             '!' => Some(Ok(ternary!(
-                program.front() == Some(&'='),
+                program.get(i + 1) == Some(&(i + 1, '=')),
                 Token::OPERATOR(Operator::BANGEQ),
                 Token::OPERATOR(Operator::BANG)
             ))),
             '=' => Some(Ok(ternary!(
-                program.front() == Some(&'='),
+                program.get(i + 1) == Some(&(i + 1, '=')),
                 Token::OPERATOR(Operator::EQUALEQ),
                 Token::OPERATOR(Operator::EQUAL)
             ))),
             '<' => Some(Ok(ternary!(
-                program.front() == Some(&'='),
+                program.get(i + 1) == Some(&(i + 1, '=')),
                 Token::OPERATOR(Operator::LESSEQ),
                 Token::OPERATOR(Operator::LESS)
             ))),
             '>' => Some(Ok(ternary!(
-                program.front() == Some(&'='),
+                program.get(i + 1) == Some(&(i + 1, '=')),
                 Token::OPERATOR(Operator::GREATEREQ),
                 Token::OPERATOR(Operator::GREATER)
             ))),
-            '"' => Some(tokenize_string_literal(&mut program)),
+            '"' => Some(tokenize_string(&mut program)),
+            '0'..='9' => Some(tokenize_number(&mut program)),
             _ => None,
         };
         if let Some(Ok(Token::OPERATOR(
             Operator::BANGEQ | Operator::EQUALEQ | Operator::LESSEQ | Operator::GREATEREQ,
         ))) = token
         {
+            program.pop_front();
             program.pop_front();
         };
         token.map(|token| tokens.push(token));
