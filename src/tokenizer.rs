@@ -1,4 +1,5 @@
 use crate::ternary;
+use core::num;
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +26,32 @@ impl std::fmt::Display for Token {
         }
     }
 }
+
+impl Token {
+    fn new_op(op: Operator, line: usize, col: usize) -> Self {
+        Self::OPERATOR(op, line, col)
+    }
+
+    fn new_num(num: f64, line: usize, col: usize) -> Self {
+        Self::NUMBER(num, line, col)
+    } 
+
+    fn new_str(str: String, line: usize, col: usize) -> Self {
+        Self::STRING(str, line, col)
+    }
+
+    fn new_kw(kw: Keyword, line: usize, col: usize) -> Self {
+        Self::KEYWORD(kw, line, col)
+    }
+
+    fn new_id(id: String, line: usize, col: usize) -> Self {
+        Self::IDENTIFIER(id, line, col)
+    }
+
+    fn new_punc(punc: Punctuation, line: usize, col: usize) -> Self {
+        Self::PUNCTUATION(punc, line, col)
+    }
+ }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Keyword {
@@ -129,106 +156,132 @@ impl std::fmt::Display for Operator {
     }
 }
 
-fn tokenize_string(program: &mut VecDeque<(usize, char)>, line: &mut usize, col: &mut usize) -> Result<Token, String> {
-    let mut chars: Vec<String> = vec![];
-    program.pop_front();
-
-    while let Some((_, char)) = program.front() {
-        if char == &'"' {
-            return Ok(Token::STRING(chars.join(""), *line, *col));
+fn tokenize_string(program: &VecDeque<(usize, char)>, line: usize, offset: usize) -> (Option<Result<Token, String>>, usize) {
+    let mut chars: Vec<char> = vec![];
+    if let Some((idx, '"')) = program.front() {
+        let mut i = *idx;
+        while program.get(i).map(|(_, c)| *c != '"').unwrap_or(false) {
+            chars.push(program.get(i).unwrap().1);
+            i += 1;
+        };
+        if let Some((_, '"')) = program.get(i) {
+            (Some(Ok(Token::STRING(chars.iter().collect::<String>(), line, idx - offset))), chars.len() + 2)
         } else {
-            chars.push(char.to_string());
-            program.pop_front();
+            (Some(Err(format!("Unterminated string in line {} col {}", line, idx - offset))), chars.len() + 1)
         }
+    } else {
+        (Some(Err(String::from("Expected a string, but found no starting '\"'"))), 0)
     }
-    Err(format!("Unterminated string: {}", chars.join("")))
 }
 
-fn tokenize_logical_operator(program: &mut VecDeque<(usize, char)>, line: &mut usize, col: &mut usize) -> Result<Token, String> {
+fn tokenize_logical_op(program: &VecDeque<(usize, char)>, line: usize, offset: usize) -> (Option<Result<Token, String>>, usize) {
     let curr = program.front();
     let mut next_is_equal_char = false;
+
     if let Some((i, _)) = curr {
         next_is_equal_char = matches!(program.get(i + 1), Some((_, '=')));
     };
 
     let token = match curr {
-        Some((_, '!')) => Ok(ternary!(
+        Some((idx, '!')) => Ok(ternary!(
             next_is_equal_char,
-            Token::OPERATOR(Operator::BANGEQ, *line, *col),
-            Token::OPERATOR(Operator::BANG, *line, *col)
+            Token::OPERATOR(Operator::BANGEQ, line, *idx - offset),
+            Token::OPERATOR(Operator::BANG, line, *idx - offset)
         )),
-        Some((_, '=')) => Ok(ternary!(
+        Some((idx, '=')) => Ok(ternary!(
             next_is_equal_char,
-            Token::OPERATOR(Operator::EQUALEQ, *line, *col),
-            Token::OPERATOR(Operator::EQUAL, *line, *col)
+            Token::OPERATOR(Operator::EQUALEQ, line, *idx - offset),
+            Token::OPERATOR(Operator::EQUAL, line, *idx - offset)
         )),
-        Some((_, '<')) => Ok(ternary!(
+        Some((idx, '<')) => Ok(ternary!(
             next_is_equal_char,
-            Token::OPERATOR(Operator::LESSEQ, *line, *col),
-            Token::OPERATOR(Operator::LESS, *line, *col)
+            Token::OPERATOR(Operator::LESSEQ, line, *idx - offset),
+            Token::OPERATOR(Operator::LESS, line, *idx - offset)
         )),
-        Some((_, '>')) => Ok(ternary!(
+        Some((idx, '>')) => Ok(ternary!(
             next_is_equal_char,
-            Token::OPERATOR(Operator::GREATEREQ, *line, *col),
-            Token::OPERATOR(Operator::GREATER, *line, *col)
+            Token::OPERATOR(Operator::GREATEREQ, line, *idx - offset),
+            Token::OPERATOR(Operator::GREATER, line, *idx - offset)
         )),
-        _ => Err(format!("Expected logical operator or assignment")),
+        Some((idx, char)) => Err(format!("Expected logical operator or assignment in line {} column {}, found '{}' instead", line, *idx - offset, char)),
+        None => Err(format!("Expected logical operator or assignment in line {}", line))
     };
-    if next_is_equal_char {
-        program.pop_front();
-    };
-    token
+    if token.is_ok() {
+        (Some(token), ternary!(next_is_equal_char, 2, 1))
+    } else {
+        (Some(token), 0)
+    }
 }
 
-fn tokenize_number(program: &mut VecDeque<(usize, char)>, line: &mut usize, col: &mut usize) -> Result<Token, String> {
+fn tokenize_number(program: &VecDeque<(usize, char)>, line: usize, offset: usize) -> (Option<Result<Token, String>>, usize) {    
+    if let Some((idx, _)) = program.front() {
+        let mut digits: Vec<char> = vec![];
+        let mut i = *idx;
+        while program.get(i).map(|(_, char)| char.is_numeric() || char == &'.').unwrap_or(false) {
+            digits.push(program.get(i).unwrap().1);
+            i += 1;
+        };
+        match digits.iter().collect::<String>().parse() {
+            Ok(num) => (Some(Ok(Token::NUMBER(num, line, idx - offset))), digits.len()),
+            Err(_) => (Some(Err(format!("Invalid number in line {} column {}", line, idx))), digits.len()),
+        }
+    } else {
+        (None, 0)
+    }
+}
+
+fn tokenize_kw_or_id(program: &VecDeque<(usize, char)>, line: usize, offset: usize) -> (Option<Result<Token, String>>, usize) {
     todo!();
-}
-
-fn tokenize_kw_or_id(program: &mut VecDeque<(usize, char)>, line: &mut usize, col: &mut usize) -> Result<Token, String> {
-    todo!();
-}
-
-fn increase_line_count<T>(line: &mut usize, count: usize) -> Option<T> {
-    *line += count;
-    None
-}
-
-fn increase_column_count<T>(column: &mut usize, count: usize) -> Option<T> {
-    *column += count;
-    None
 }
 
 pub fn tokenize(program: &str) -> Vec<Result<Token, String>> {
     let mut program: VecDeque<(usize, char)> = program.chars().enumerate().collect();
     let mut tokens: Vec<Result<Token, String>> = vec![];
     let mut line: usize = 0;
-    let mut col: usize = 0;
+    let mut offset: usize = 0;
 
-    while let Some((_, char)) = program.front() {
-        let token = match char {
-            '(' => Some(Ok(Token::PUNCTUATION(Punctuation::LPAREN, line, col))),
-            ')' => Some(Ok(Token::PUNCTUATION(Punctuation::RPAREN, line, col))),
-            '{' => Some(Ok(Token::PUNCTUATION(Punctuation::LBRACE, line, col))),
-            '}' => Some(Ok(Token::PUNCTUATION(Punctuation::RBRACE, line, col))),
-            ',' => Some(Ok(Token::PUNCTUATION(Punctuation::COMMA, line, col))),
-            '.' => Some(Ok(Token::PUNCTUATION(Punctuation::DOT, line, col))),
-            ';' => Some(Ok(Token::PUNCTUATION(Punctuation::SEMICOLON, line, col))),
-            '+' => Some(Ok(Token::OPERATOR(Operator::PLUS, line, col))),
-            '-' => Some(Ok(Token::OPERATOR(Operator::MINUS, line, col))),
-            '*' => Some(Ok(Token::OPERATOR(Operator::STAR, line, col))),
-            '/' => Some(Ok(Token::OPERATOR(Operator::SLASH, line, col))),
-            '!' | '=' | '<' | '>' => Some(tokenize_logical_operator(&mut program, &mut line, &mut col)),
-            '"' => Some(tokenize_string(&mut program, &mut line, &mut col)),
-            '0'..='9' => Some(tokenize_number(&mut program, &mut line, &mut col)),
-            'a'..='z' | 'A'..='Z' | '_' => Some(tokenize_kw_or_id(&mut program, &mut line, &mut col)),
-            ' ' => increase_column_count(&mut col, 1),
-            '\t' => increase_column_count(&mut col, 4),
-            '\n' => increase_line_count(&mut line, 1),
-            _ => None,
+    let mut num_iters: usize = 0;
+    let length = program.len();
+
+    while let Some((idx, char)) = program.front() {
+        if num_iters == length {
+            break;
         };
-        program.pop_front();
-        token.map(|token| tokens.push(token));
-    }
-    tokens.push(Ok(Token::EOF(line, col)));
+        let ts = match char {
+            '(' => (Some(Ok(Token::PUNCTUATION(Punctuation::LPAREN, line, *idx - offset))), 1),
+            ')' => (Some(Ok(Token::PUNCTUATION(Punctuation::RPAREN, line, *idx - offset))), 1),
+            '{' => (Some(Ok(Token::PUNCTUATION(Punctuation::LBRACE, line, *idx - offset))), 1),
+            '}' => (Some(Ok(Token::PUNCTUATION(Punctuation::RBRACE, line, *idx - offset))), 1),
+            ',' => (Some(Ok(Token::PUNCTUATION(Punctuation::COMMA, line, *idx - offset))), 1),
+            '.' => (Some(Ok(Token::PUNCTUATION(Punctuation::DOT, line, *idx - offset))), 1),
+            ';' => (Some(Ok(Token::PUNCTUATION(Punctuation::SEMICOLON, line, *idx - offset))), 1),
+            '+' => (Some(Ok(Token::OPERATOR(Operator::PLUS, line, *idx - offset))), 1),
+            '-' => (Some(Ok(Token::OPERATOR(Operator::MINUS, line, *idx - offset))), 1),
+            '*' => (Some(Ok(Token::OPERATOR(Operator::STAR, line, *idx - offset))), 1),
+            '/' => (Some(Ok(Token::OPERATOR(Operator::SLASH, line, *idx - offset))), 1),
+            '!' | '=' | '<' | '>' => tokenize_logical_op(&program, line, offset),
+            '"' => tokenize_string(&program, line, offset),
+            '0'..='9' => tokenize_number(&mut program, line, offset),
+            'a'..='z' | 'A'..='Z' | '_' => tokenize_kw_or_id(&program, line, offset),
+            '\r' => {
+                offset += 1;
+                (None, 1)
+            },
+            '\t' => {
+                offset -= 4;
+                (None, 1)
+            },
+            '\n' => {
+                line += 1;
+                (None, 1)
+            },
+            _ => (None, 1),
+        };
+        let (token, skips) = ts;
+        token.map(|t| tokens.push(t));
+        program.drain(0..skips.min(length));
+        num_iters += 1;
+    };
+    tokens.push(Ok(Token::EOF(line + 1, 0)));
     tokens
 }
