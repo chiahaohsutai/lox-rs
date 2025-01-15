@@ -1,6 +1,6 @@
 use crate::ternary;
 use core::num;
-use std::collections::VecDeque;
+use std::{collections::VecDeque, slice::SliceIndex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -172,222 +172,155 @@ impl std::fmt::Display for Operator {
     }
 }
 
-fn tokenize_string(
-    program: &VecDeque<(usize, char)>,
-    line: usize,
-    offset: usize,
-) -> (Option<Result<Token, String>>, usize) {
-    let mut chars: Vec<char> = vec![];
-    if let Some((idx, '"')) = program.front() {
-        let mut i = *idx + 1;
-        while program.get(i).map(|(_, c)| *c != '"').unwrap_or(false) {
-            println!("{}", i);
-            chars.push(program.get(i).unwrap().1);
-            println!("{:?}", chars);
-            i += 1;
-        }
-        if let Some((_, '"')) = program.get(i) {
-            let string = chars.iter().collect::<String>();
-            let token = Token::new_str(string, line, idx - offset);
-            (Some(Ok(token)), chars.len() + 2)
-        } else {
-            let msg = format!("Unterminated string in line {} col {}", line, idx - offset);
-            (Some(Err(msg)), chars.len() + 1)
-        }
-    } else {
-        let msg = String::from("Expected a string, but found no starting '\"'");
-        (Some(Err(msg)), 0)
-    }
-}
-
-fn tokenize_logical_op(
-    program: &VecDeque<(usize, char)>,
-    line: usize,
-    offset: usize,
-) -> (Option<Result<Token, String>>, usize) {
-    let curr = program.front();
-
-    if let Some((i, char)) = curr {
-        let col = *i - offset;
-        let next_is_equal_char = matches!(program.get(i + 1), Some((_, '=')));
-        let token = match char {
-            '!' => Ok(ternary!(
-                next_is_equal_char,
-                Token::new_op(Operator::BANGEQ, line, col),
-                Token::new_op(Operator::BANG, line, col)
-            )),
-            '=' => Ok(ternary!(
-                next_is_equal_char,
-                Token::new_op(Operator::EQUALEQ, line, col),
-                Token::new_op(Operator::EQUAL, line, col)
-            )),
-            '<' => Ok(ternary!(
-                next_is_equal_char,
-                Token::new_op(Operator::LESSEQ, line, col),
-                Token::new_op(Operator::LESS, line, col)
-            )),
-            '>' => Ok(ternary!(
-                next_is_equal_char,
-                Token::new_op(Operator::GREATEREQ, line, col),
-                Token::new_op(Operator::GREATER, line, col)
-            )),
-            _ => {
-                let msg = format!(
-                    "Expected logical operator or assignment in line {} column {}",
-                    line, col
-                );
-                Err(msg)
-            }
-        };
-        (Some(token), ternary!(next_is_equal_char, 2, 1))
-    } else {
-        (None, 0)
-    }
-}
-
-fn tokenize_number(
-    program: &VecDeque<(usize, char)>,
-    line: usize,
-    offset: usize,
-) -> (Option<Result<Token, String>>, usize) {
-    if let Some((idx, _)) = program.front() {
-        let mut digits: Vec<char> = vec![];
-        let mut i = *idx;
-        while program
-            .get(i)
-            .map(|(_, char)| char.is_numeric() || char == &'.')
-            .unwrap_or(false)
-        {
-            digits.push(program.get(i).unwrap().1);
-            i += 1;
-        }
-        match digits.iter().collect::<String>().parse() {
-            Ok(num) => (
-                Some(Ok(Token::NUMBER(num, line, idx - offset))),
-                digits.len(),
-            ),
-            Err(_) => (
-                Some(Err(format!(
-                    "Invalid number in line {} column {}",
-                    line, idx
-                ))),
-                digits.len(),
-            ),
-        }
-    } else {
-        (None, 0)
-    }
-}
-
-fn tokenize_kw_or_id(
-    program: &VecDeque<(usize, char)>,
-    line: usize,
-    offset: usize,
-) -> (Option<Result<Token, String>>, usize) {
-    if let Some((idx, char)) = program.front() {
-        if char.is_alphabetic() || *char == '_' {
-            let mut chars = vec![];
-            let mut pos = *idx;
-
-            while program
-                .get(pos)
-                .map(|(_, c)| c.is_alphanumeric() || *c == '_')
-                .unwrap_or(false)
-            {
-                chars.push(program.get(pos).unwrap().1);
-                pos += 1;
-            }
-
-            let string = chars.iter().collect::<String>();
-            let length = string.len();
-            let col = idx - offset;
-
-            let token = match string.as_str() {
-                "return" => Token::new_kw(Keyword::RETURN, line, col),
-                "false" => Token::new_kw(Keyword::FALSE, line, col),
-                "super" => Token::new_kw(Keyword::SUPER, line, col),
-                "while" => Token::new_kw(Keyword::WHILE, line, col),
-                "print" => Token::new_kw(Keyword::PRINT, line, col),
-                "class" => Token::new_kw(Keyword::CLASS, line, col),
-                "this" => Token::new_kw(Keyword::THIS, line, col),
-                "true" => Token::new_kw(Keyword::TRUE, line, col),
-                "else" => Token::new_kw(Keyword::ELSE, line, col),
-                "var" => Token::new_kw(Keyword::VAR, line, col),
-                "nil" => Token::new_kw(Keyword::NIL, line, col),
-                "for" => Token::new_kw(Keyword::FOR, line, col),
-                "and" => Token::new_kw(Keyword::AND, line, col),
-                "fun" => Token::new_kw(Keyword::FUN, line, col),
-                "or" => Token::new_kw(Keyword::OR, line, col),
-                _ => Token::new_id(string, line, col),
-            };
-            (Some(Ok(token)), length)
-        } else {
-            let msg = format!("Keyword or identifier must start with an alphabetic character or '_' in line {} column {}", line, idx - offset);
-            (Some(Err(msg)), 1)
-        }
-    } else {
-        (None, 0)
-    }
-}
-
 pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
-    println!("{:?}", program.as_ref().chars());
-    let mut program: VecDeque<(usize, char)> = program.as_ref().chars().enumerate().collect();
-    let mut tokens: Vec<Result<Token, String>> = vec![];
-    let mut line: usize = 0;
-    let mut offset: usize = 0;
+    let chars = program.as_ref().chars().collect::<Vec<_>>();
+    let mut tokens = vec![];
+    let mut line = 0;
+    let mut col = 0;
+    let mut i = 0;
 
-    let mut num_iters: usize = 0;
-    let length = program.len();
-
-    while let Some((idx, char)) = program.front() {
-        if num_iters == length {
-            break;
-        };
-        println!("{}", char);
-        let col = idx - offset;
-        let ts = match char {
-            '(' => (Some(Ok(Token::new_punc(Punctuation::LPAREN, line, col))), 1),
-            ')' => (Some(Ok(Token::new_punc(Punctuation::RPAREN, line, col))), 1),
-            '{' => (Some(Ok(Token::new_punc(Punctuation::LBRACE, line, col))), 1),
-            '}' => (Some(Ok(Token::new_punc(Punctuation::RBRACE, line, col))), 1),
-            ',' => (Some(Ok(Token::new_punc(Punctuation::COMMA, line, col))), 1),
-            '.' => (Some(Ok(Token::new_punc(Punctuation::DOT, line, col))), 1),
-            ';' => (
-                Some(Ok(Token::new_punc(Punctuation::SEMICOLON, line, col))),
-                1,
-            ),
-            '+' => (Some(Ok(Token::new_op(Operator::PLUS, line, col))), 1),
-            '-' => (Some(Ok(Token::new_op(Operator::MINUS, line, col))), 1),
-            '*' => (Some(Ok(Token::new_op(Operator::STAR, line, col))), 1),
-            '/' => (Some(Ok(Token::new_op(Operator::SLASH, line, col))), 1),
-            '!' | '=' | '<' | '>' => tokenize_logical_op(&program, line, offset),
-            '"' => tokenize_string(&program, line, offset),
-            '0'..='9' => tokenize_number(&mut program, line, offset),
-            'a'..='z' | 'A'..='Z' | '_' => tokenize_kw_or_id(&program, line, offset),
-            '\r' => {
-                offset += 1;
-                (None, 1)
+    while let Some(char) = chars.get(i) {
+        match char {
+            '(' => tokens.push(Ok(Token::new_punc(Punctuation::LPAREN, line, col))),
+            ')' => tokens.push(Ok(Token::new_punc(Punctuation::RPAREN, line, col))),
+            '{' => tokens.push(Ok(Token::new_punc(Punctuation::LBRACE, line, col))),
+            '}' => tokens.push(Ok(Token::new_punc(Punctuation::RBRACE, line, col))),
+            ',' => tokens.push(Ok(Token::new_punc(Punctuation::COMMA, line, col))),
+            '.' => tokens.push(Ok(Token::new_punc(Punctuation::DOT, line, col))),
+            ';' => tokens.push(Ok(Token::new_punc(Punctuation::SEMICOLON, line, col))),
+            '+' => tokens.push(Ok(Token::new_op(Operator::PLUS, line, col))),
+            '-' => tokens.push(Ok(Token::new_op(Operator::MINUS, line, col))),
+            '/' => {
+                if let Some('/') = chars.get(i + 1) {
+                    while !matches!(chars.get(i + 2), Some('\n') | None)
+                        && !matches!(chars.get(i + 3), Some('\n') | None)
+                    {
+                        i += 1;
+                    }
+                } else {
+                    tokens.push(Ok(Token::new_op(Operator::SLASH, line, col)));
+                }
+            }
+            '!' => {
+                if let Some('=') = chars.get(i + 1) {
+                    tokens.push(Ok(Token::new_op(Operator::BANGEQ, line, col)));
+                    i += 1;
+                    col += 1;
+                } else {
+                    tokens.push(Ok(Token::new_op(Operator::BANG, line, col)));
+                }
+            }
+            '=' => {
+                if let Some('=') = chars.get(i + 1) {
+                    tokens.push(Ok(Token::new_op(Operator::EQUALEQ, line, col)));
+                    i += 1;
+                    col += 1;
+                } else {
+                    tokens.push(Ok(Token::new_op(Operator::EQUAL, line, col)));
+                }
+            }
+            '<' => {
+                if let Some('=') = chars.get(i + 1) {
+                    tokens.push(Ok(Token::new_op(Operator::LESSEQ, line, col)));
+                    i += 1;
+                    col += 1;
+                } else {
+                    tokens.push(Ok(Token::new_op(Operator::LESS, line, col)));
+                }
+            }
+            '>' => {
+                if let Some('=') = chars.get(i + 1) {
+                    tokens.push(Ok(Token::new_op(Operator::GREATEREQ, line, col)));
+                    i += 1;
+                    col += 1;
+                } else {
+                    tokens.push(Ok(Token::new_op(Operator::GREATER, line, col)));
+                }
+            }
+            '"' => {
+                let mut string = vec![];
+                while !matches!(chars.get(i + 1), Some('"') | None)
+                    && !matches!(chars.get(i + 2), Some('"') | None)
+                {
+                    string.push(*chars.get(i + 1).unwrap());
+                    i += 1;
+                }
+                let string: String = string.iter().collect();
+                if let Some('"') = chars.get(i + 1) {
+                    col += string.len() + 2;
+                    tokens.push(Ok(Token::new_str(string, line, col)));
+                } else {
+                    tokens.push(Err(format!(
+                        "Unterminated string literal in line {} col {}",
+                        line, col
+                    )));
+                    col += string.len() + 1;
+                };
+            }
+            '0'..='9' => {
+                let mut number = vec![];
+                while chars
+                    .get(i)
+                    .map(|&char| char.is_numeric() || char == '.')
+                    .unwrap_or(false)
+                {
+                    number.push(*chars.get(i).unwrap());
+                    i += 1;
+                }
+                i -= 1;
+                let number: String = number.iter().collect();
+                if let Ok(number) = number.parse() {
+                    tokens.push(Ok(Token::new_num(number, line, col)));
+                } else {
+                    tokens.push(Err(format!("Invalid number in line {} col {}", line, col)));
+                }
+                col += number.len();
+            }
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut word = vec![];
+                while chars
+                    .get(i)
+                    .map(|&char| char.is_alphanumeric() || char == '_')
+                    .unwrap_or(false)
+                {
+                    word.push(*chars.get(i).unwrap());
+                    i += 1
+                }
+                i -= 1;
+                let word: String = word.iter().collect();
+                col += word.len();
+                let token = match word.as_str() {
+                    "return" => Token::new_kw(Keyword::RETURN, line, col),
+                    "false" => Token::new_kw(Keyword::FALSE, line, col),
+                    "super" => Token::new_kw(Keyword::SUPER, line, col),
+                    "while" => Token::new_kw(Keyword::WHILE, line, col),
+                    "print" => Token::new_kw(Keyword::PRINT, line, col),
+                    "class" => Token::new_kw(Keyword::CLASS, line, col),
+                    "this" => Token::new_kw(Keyword::THIS, line, col),
+                    "true" => Token::new_kw(Keyword::TRUE, line, col),
+                    "else" => Token::new_kw(Keyword::ELSE, line, col),
+                    "var" => Token::new_kw(Keyword::VAR, line, col),
+                    "nil" => Token::new_kw(Keyword::NIL, line, col),
+                    "for" => Token::new_kw(Keyword::FOR, line, col),
+                    "and" => Token::new_kw(Keyword::AND, line, col),
+                    "fun" => Token::new_kw(Keyword::FUN, line, col),
+                    "or" => Token::new_kw(Keyword::OR, line, col),
+                    _ => Token::new_id(word, line, col),
+                };
+                tokens.push(Ok(token));
             }
             '\t' => {
-                offset -= 4;
-                (None, 1)
+                col += 4;
             }
             '\n' => {
                 line += 1;
-                offset = idx + 1;
-                (None, 1)
+                col = 0;
             }
-            _ => (None, 1),
+            _ => (),
         };
-        let (token, skips) = ts;
-        token.map(|t| tokens.push(t));
-        println!("skips {}", skips);
-        program.drain(0..skips.min(length));
-        num_iters += 1;
-        println!("{:?}", program)
+        i += 1;
+        col += 1;
     }
-    tokens.push(Ok(Token::EOF(line + 1, 0)));
     tokens
 }
 
