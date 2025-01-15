@@ -197,6 +197,7 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
                     {
                         i += 1;
                     }
+                    i -= 1;
                 } else {
                     tokens.push(Ok(Token::new_op(Operator::SLASH, line, col)));
                 }
@@ -239,22 +240,23 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
             }
             '"' => {
                 let mut string = vec![];
-                while !matches!(chars.get(i + 1), Some('"') | None)
-                    && !matches!(chars.get(i + 2), Some('"') | None)
+                let offset = string.len();
+                while chars.get(i + 1).map(|&char| char != '"').unwrap_or(false)
                 {
                     string.push(*chars.get(i + 1).unwrap());
                     i += 1;
                 }
                 let string: String = string.iter().collect();
                 if let Some('"') = chars.get(i + 1) {
-                    col += string.len() + 2;
                     tokens.push(Ok(Token::new_str(string, line, col)));
+                    col += offset + 1;
+                    i += 1;
                 } else {
                     tokens.push(Err(format!(
                         "Unterminated string literal in line {} col {}",
                         line, col
                     )));
-                    col += string.len() + 1;
+                    col += string.len();
                 };
             }
             '0'..='9' => {
@@ -274,7 +276,7 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
                 } else {
                     tokens.push(Err(format!("Invalid number in line {} col {}", line, col)));
                 }
-                col += number.len();
+                col += number.len() - 1;
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut word = vec![];
@@ -288,7 +290,7 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
                 }
                 i -= 1;
                 let word: String = word.iter().collect();
-                col += word.len();
+                let offset = word.len();
                 let token = match word.as_str() {
                     "return" => Token::new_kw(Keyword::RETURN, line, col),
                     "false" => Token::new_kw(Keyword::FALSE, line, col),
@@ -308,6 +310,7 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
                     _ => Token::new_id(word, line, col),
                 };
                 tokens.push(Ok(token));
+                col += offset - 1;
             }
             '\t' => {
                 col += 4;
@@ -321,6 +324,7 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
         i += 1;
         col += 1;
     }
+    tokens.push(Ok(Token::EOF(line + 1, 0)));
     tokens
 }
 
@@ -329,13 +333,29 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_string() {
+    fn test_tokenize_string() {
         let program = r#"var = "Hello World!""#;
         let tokens = tokenize(program);
         let expected = vec![
             Ok(Token::new_kw(Keyword::VAR, 0, 0)),
             Ok(Token::new_op(Operator::EQUAL, 0, 4)),
             Ok(Token::new_str("Hello World!".to_string(), 0, 6)),
+            Ok(Token::EOF(1, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_arithmetic_expr() {
+        let program = "1.2 + 2 - 4;";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_num(1.2, 0, 0)),
+            Ok(Token::new_op(Operator::PLUS, 0, 4)),
+            Ok(Token::new_num(2.0, 0, 6)),
+            Ok(Token::new_op(Operator::MINUS, 0, 8)),
+            Ok(Token::new_num(4.0, 0, 10)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 0, 11)),
             Ok(Token::EOF(1, 0)),
         ];
         assert_eq!(tokens, expected);
