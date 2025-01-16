@@ -192,12 +192,10 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
             '-' => tokens.push(Ok(Token::new_op(Operator::MINUS, line, col))),
             '/' => {
                 if let Some('/') = chars.get(i + 1) {
-                    while !matches!(chars.get(i + 2), Some('\n') | None)
-                        && !matches!(chars.get(i + 3), Some('\n') | None)
+                    while chars.get(i + 1).map(|&c| c != '\n').unwrap_or(false)
                     {
                         i += 1;
                     }
-                    i -= 1;
                 } else {
                     tokens.push(Ok(Token::new_op(Operator::SLASH, line, col)));
                 }
@@ -314,10 +312,14 @@ pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
             }
             '\t' => {
                 col += 4;
+                i += 1;
+                continue;
             }
             '\n' => {
                 line += 1;
                 col = 0;
+                i += 1;
+                continue;
             }
             _ => (),
         };
@@ -356,6 +358,99 @@ mod test {
             Ok(Token::new_op(Operator::MINUS, 0, 8)),
             Ok(Token::new_num(4.0, 0, 10)),
             Ok(Token::new_punc(Punctuation::SEMICOLON, 0, 11)),
+            Ok(Token::EOF(1, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_with_comments() {
+        let program = "// comment\nprint 1 + 2;";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::PRINT, 1, 0)),
+            Ok(Token::new_num(1.0, 1, 6)),
+            Ok(Token::new_op(Operator::PLUS, 1, 8)),
+            Ok(Token::new_num(2.0, 1, 10)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 11)),
+            Ok(Token::EOF(2, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_with_tabs() {
+        let program = "\n\tprint 1 + 2;";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::PRINT, 1, 4)),
+            Ok(Token::new_num(1.0, 1, 10)),
+            Ok(Token::new_op(Operator::PLUS, 1, 12)),
+            Ok(Token::new_num(2.0, 1, 14)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 15)),
+            Ok(Token::EOF(2, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_identifier() {
+        let program = "var a = b;\nprint a;";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
+            Ok(Token::new_id("a".to_string(), 0, 4)),
+            Ok(Token::new_op(Operator::EQUAL, 0, 6)),
+            Ok(Token::new_id("b".to_string(), 0, 8)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 0, 9)),
+            Ok(Token::new_kw(Keyword::PRINT, 1, 0)),
+            Ok(Token::new_id("a".to_string(), 1, 6)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 7)),
+            Ok(Token::EOF(2, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_keywords() {
+        let program = "fun foo_o() {\n\tprint 1;\n}";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::FUN, 0, 0)),
+            Ok(Token::new_id("foo_o".to_string(), 0, 4)),
+            Ok(Token::new_punc(Punctuation::LPAREN, 0, 9)),
+            Ok(Token::new_punc(Punctuation::RPAREN, 0, 10)),
+            Ok(Token::new_punc(Punctuation::LBRACE, 0, 12)),
+            Ok(Token::new_kw(Keyword::PRINT, 1, 4)),
+            Ok(Token::new_num(1.0, 1, 10)),
+            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 11)),
+            Ok(Token::new_punc(Punctuation::RBRACE, 2, 0)),
+            Ok(Token::EOF(3, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_incomplete_string() {
+        let program = r#"var = "Hello World!"#;
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
+            Ok(Token::new_op(Operator::EQUAL, 0, 4)),
+            Err("Unterminated string literal in line 0 col 6".to_string()),
+            Ok(Token::EOF(1, 0)),
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_invalid_number() {
+        let program = "var = 1.2.3;";
+        let tokens = tokenize(program);
+        let expected = vec![
+            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
+            Ok(Token::new_op(Operator::EQUAL, 0, 4)),
+            Err("Invalid number in line 0 col 6".to_string()),
             Ok(Token::EOF(1, 0)),
         ];
         assert_eq!(tokens, expected);
