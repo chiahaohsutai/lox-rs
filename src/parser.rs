@@ -6,6 +6,62 @@ use std::{
     slice::Iter,
 };
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Literal {
+    String(String),
+    Boolean(bool),
+    Number(f64),
+    Nil,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expression {
+    Binary(Box<Expression>, Operator, Box<Expression>),
+    Unary(Operator, Box<Expression>),
+    Literal(Literal),
+    Grouping(Box<Expression>),
+    Variable(String),
+}
+
+impl std::fmt::Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::String(s) => write!(f, "{}", s),
+            Self::Boolean(b) => write!(f, "{}", b),
+            Self::Number(n) => write!(f, "{}", n),
+            Self::Nil => write!(f, "nil"),
+        }
+    }
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Binary(left, op, right) => write!(f, "({} {} {})", op, left, right),
+            Self::Unary(op, expr) => write!(f, "({} {})", op, expr),
+            Self::Grouping(expr) => write!(f, "(group {})", expr),
+            Self::Literal(literal) => write!(f, "{}", literal),
+            Self::Variable(name) => write!(f, "(variable {})", name),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Statement {
+    Expression(Expression),
+    Print(Expression),
+}
+
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Expression(expr) => write!(f, "{}", expr),
+            Self::Print(expr) => write!(f, "print {}", expr),
+        }
+    }
+}
+
+
 #[derive(Debug, PartialEq)]
 pub enum LiteralExpr {
     String(String),
