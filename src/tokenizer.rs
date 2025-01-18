@@ -1,454 +1,226 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    EOF(usize, usize),
-    NUMBER(f64, usize, usize),
-    STRING(String, usize, usize),
-    KEYWORD(Keyword, usize, usize),
-    OPERATOR(Operator, usize, usize),
-    IDENTIFIER(String, usize, usize),
-    PUNCTUATION(Punctuation, usize, usize),
+    Identifier(String),
+    String(String),
+    Number(f64),
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Mimus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+    Eof,
 }
 
 impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::EOF(line, col) => write!(f, "EOF[line: {}, column: {}]", line, col),
-            Self::NUMBER(n, line, col) => {
-                write!(f, "NUMBER[value: {}, line: {}, column: {}]", n, line, col)
-            }
-            Self::STRING(s, line, col) => {
-                write!(f, "STRING[value: {}, line: {}, column: {}]", s, line, col)
-            }
-            Self::KEYWORD(k, line, col) => {
-                write!(f, "KEYWORD[value: {}, line: {}, column: {}]", k, line, col)
-            }
-            Self::IDENTIFIER(i, line, col) => write!(
-                f,
-                "IDENTIFIER[value: {}, line: {}, column: {}]",
-                i, line, col
-            ),
-            Self::OPERATOR(o, line, col) => {
-                write!(f, "OPERATOR[value: {}, line: {}, column: {}]", o, line, col)
-            }
-            Self::PUNCTUATION(p, line, col) => write!(
-                f,
-                "PUNCTUATION[value: {}, line: {}, column: {}]",
-                p, line, col
-            ),
+            Self::Identifier(s) => write!(f, "{}", s),
+            Self::String(s) => write!(f, "{}", s),
+            Self::Number(n) => write!(f, "{}", n),
+            Self::LeftParen => write!(f, "("),
+            Self::RightParen => write!(f, ")"),
+            Self::LeftBrace => write!(f, "{{"),
+            Self::RightBrace => write!(f, "}}"),
+            Self::Comma => write!(f, ","),
+            Self::Dot => write!(f, "."),
+            Self::Mimus => write!(f, "-"),
+            Self::Plus => write!(f, "+"),
+            Self::Semicolon => write!(f, ";"),
+            Self::Slash => write!(f, "/"),
+            Self::Star => write!(f, "*"),
+            Self::Bang => write!(f, "!"),
+            Self::BangEqual => write!(f, "!="),
+            Self::Equal => write!(f, "="),
+            Self::EqualEqual => write!(f, "=="),
+            Self::Greater => write!(f, ">"),
+            Self::GreaterEqual => write!(f, ">="),
+            Self::Less => write!(f, "<"),
+            Self::LessEqual => write!(f, "<="),
+            Self::And => write!(f, "and"),
+            Self::Class => write!(f, "class"),
+            Self::Else => write!(f, "else"),
+            Self::False => write!(f, "false"),
+            Self::Fun => write!(f, "fun"),
+            Self::For => write!(f, "for"),
+            Self::If => write!(f, "if"),
+            Self::Nil => write!(f, "nil"),
+            Self::Or => write!(f, "or"),
+            Self::Print => write!(f, "print"),
+            Self::Return => write!(f, "return"),
+            Self::Super => write!(f, "super"),
+            Self::This => write!(f, "this"),
+            Self::True => write!(f, "true"),
+            Self::Var => write!(f, "var"),
+            Self::While => write!(f, "while"),
+            Self::Eof => write!(f, "EOF"),
         }
     }
 }
 
-impl Token {
-    fn new_op(op: Operator, line: usize, col: usize) -> Self {
-        Self::OPERATOR(op, line, col)
-    }
-
-    fn new_num(num: f64, line: usize, col: usize) -> Self {
-        Self::NUMBER(num, line, col)
-    }
-
-    fn new_str(str: String, line: usize, col: usize) -> Self {
-        Self::STRING(str, line, col)
-    }
-
-    fn new_kw(kw: Keyword, line: usize, col: usize) -> Self {
-        Self::KEYWORD(kw, line, col)
-    }
-
-    fn new_id(id: String, line: usize, col: usize) -> Self {
-        Self::IDENTIFIER(id, line, col)
-    }
-
-    fn new_punc(punc: Punctuation, line: usize, col: usize) -> Self {
-        Self::PUNCTUATION(punc, line, col)
+#[derive(Debug, PartialEq, Clone)]
+struct Lexeme {
+    line: usize,
+    token: Token,
+}
+impl Lexeme {
+    fn new(line: usize, token: Token) -> Self {
+        Self { line, token }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum Keyword {
-    IF,
-    OR,
-    FUN,
-    AND,
-    FOR,
-    NIL,
-    VAR,
-    ELSE,
-    TRUE,
-    THIS,
-    CLASS,
-    PRINT,
-    WHILE,
-    SUPER,
-    FALSE,
-    RETURN,
-}
-
-impl std::fmt::Display for Keyword {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::IF => write!(f, "IF"),
-            Self::OR => write!(f, "OR"),
-            Self::FUN => write!(f, "FUN"),
-            Self::AND => write!(f, "AND"),
-            Self::FOR => write!(f, "FOR"),
-            Self::NIL => write!(f, "NIL"),
-            Self::VAR => write!(f, "VAR"),
-            Self::ELSE => write!(f, "ELSE"),
-            Self::TRUE => write!(f, "TRUE"),
-            Self::THIS => write!(f, "THIS"),
-            Self::CLASS => write!(f, "CLASS"),
-            Self::PRINT => write!(f, "PRINT"),
-            Self::WHILE => write!(f, "WHILE"),
-            Self::SUPER => write!(f, "SUPER"),
-            Self::FALSE => write!(f, "FALSE"),
-            Self::RETURN => write!(f, "RETURN"),
-        }
+impl std::fmt::Display for Lexeme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} at line {}", self.token, self.line)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum Punctuation {
-    DOT,
-    COMMA,
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
-    SEMICOLON,
-}
+fn tokenize<'a, T: AsRef<str>>(program: T) -> Vec<Result<Lexeme, String>> {
+    let mut program = program.as_ref().chars().rev().collect::<Vec<char>>();
+    let mut lexemes = Vec::new();
+    let mut ln = 0;
 
-impl std::fmt::Display for Punctuation {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::COMMA => write!(f, ","),
-            Self::DOT => write!(f, "."),
-            Self::LBRACE => write!(f, "{{"),
-            Self::LPAREN => write!(f, "("),
-            Self::RBRACE => write!(f, "}}"),
-            Self::RPAREN => write!(f, ")"),
-            Self::SEMICOLON => write!(f, ";"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum Operator {
-    BANG,
-    LESS,
-    PLUS,
-    STAR,
-    EQUAL,
-    SLASH,
-    MINUS,
-    LESSEQ,
-    BANGEQ,
-    GREATER,
-    EQUALEQ,
-    GREATEREQ,
-}
-
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::BANG => write!(f, "!"),
-            Self::LESS => write!(f, "<"),
-            Self::PLUS => write!(f, "+"),
-            Self::STAR => write!(f, "*"),
-            Self::EQUAL => write!(f, "="),
-            Self::SLASH => write!(f, "/"),
-            Self::MINUS => write!(f, "-"),
-            Self::LESSEQ => write!(f, "<="),
-            Self::BANGEQ => write!(f, "!="),
-            Self::GREATER => write!(f, ">"),
-            Self::EQUALEQ => write!(f, "=="),
-            Self::GREATEREQ => write!(f, ">="),
-        }
-    }
-}
-
-pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
-    let chars = program.as_ref().chars().collect::<Vec<_>>();
-    let mut tokens = vec![];
-    let mut line = 0;
-    let mut col = 0;
-    let mut i = 0;
-
-    while let Some(char) = chars.get(i) {
-        match char {
-            '(' => tokens.push(Ok(Token::new_punc(Punctuation::LPAREN, line, col))),
-            ')' => tokens.push(Ok(Token::new_punc(Punctuation::RPAREN, line, col))),
-            '{' => tokens.push(Ok(Token::new_punc(Punctuation::LBRACE, line, col))),
-            '}' => tokens.push(Ok(Token::new_punc(Punctuation::RBRACE, line, col))),
-            ',' => tokens.push(Ok(Token::new_punc(Punctuation::COMMA, line, col))),
-            '.' => tokens.push(Ok(Token::new_punc(Punctuation::DOT, line, col))),
-            ';' => tokens.push(Ok(Token::new_punc(Punctuation::SEMICOLON, line, col))),
-            '+' => tokens.push(Ok(Token::new_op(Operator::PLUS, line, col))),
-            '-' => tokens.push(Ok(Token::new_op(Operator::MINUS, line, col))),
+    while program.len() > 0 {
+        let c = program.pop().unwrap();
+        if c == '\n' {
+            ln += 1;
+            continue;
+        };
+        let lexeme = match c {
+            '(' => Ok(Lexeme::new(ln, Token::LeftParen)),
+            ')' => Ok(Lexeme::new(ln, Token::RightParen)),
+            '{' => Ok(Lexeme::new(ln, Token::LeftBrace)),
+            '}' => Ok(Lexeme::new(ln, Token::RightBrace)),
+            ',' => Ok(Lexeme::new(ln, Token::Comma)),
+            '.' => Ok(Lexeme::new(ln, Token::Dot)),
+            '-' => Ok(Lexeme::new(ln, Token::Mimus)),
+            '+' => Ok(Lexeme::new(ln, Token::Plus)),
+            ';' => Ok(Lexeme::new(ln, Token::Semicolon)),
+            '*' => Ok(Lexeme::new(ln, Token::Star)),
             '/' => {
-                if let Some('/') = chars.get(i + 1) {
-                    while chars.get(i + 1).map(|&c| c != '\n').unwrap_or(false)
-                    {
-                        i += 1;
+                if let Some(&'/') = program.last() {
+                    while program.last() != Some(&'\n') {
+                        program.pop();
+                    }
+                    continue;
+                } else {
+                    Ok(Lexeme::new(ln, Token::Slash))
+                }
+            },
+            '!' | '=' | '<' | '>' => {
+                if let Some(&'=') = program.last() {
+                    program.pop();
+                    match c {
+                        '!' => Ok(Lexeme::new(ln, Token::BangEqual)),
+                        '=' => Ok(Lexeme::new(ln, Token::EqualEqual)),
+                        '<' => Ok(Lexeme::new(ln, Token::LessEqual)),
+                        '>' => Ok(Lexeme::new(ln, Token::GreaterEqual)),
+                        _ => unreachable!(),
                     }
                 } else {
-                    tokens.push(Ok(Token::new_op(Operator::SLASH, line, col)));
+                    match c {
+                        '!' => Ok(Lexeme::new(ln, Token::Bang)),
+                        '=' => Ok(Lexeme::new(ln, Token::Equal)),
+                        '<' => Ok(Lexeme::new(ln, Token::Less)),
+                        '>' => Ok(Lexeme::new(ln, Token::Greater)),
+                        _ => unreachable!(),
+                    }
                 }
             }
-            '!' => {
-                if let Some('=') = chars.get(i + 1) {
-                    tokens.push(Ok(Token::new_op(Operator::BANGEQ, line, col)));
-                    i += 1;
-                    col += 1;
-                } else {
-                    tokens.push(Ok(Token::new_op(Operator::BANG, line, col)));
-                }
-            }
-            '=' => {
-                if let Some('=') = chars.get(i + 1) {
-                    tokens.push(Ok(Token::new_op(Operator::EQUALEQ, line, col)));
-                    i += 1;
-                    col += 1;
-                } else {
-                    tokens.push(Ok(Token::new_op(Operator::EQUAL, line, col)));
-                }
-            }
-            '<' => {
-                if let Some('=') = chars.get(i + 1) {
-                    tokens.push(Ok(Token::new_op(Operator::LESSEQ, line, col)));
-                    i += 1;
-                    col += 1;
-                } else {
-                    tokens.push(Ok(Token::new_op(Operator::LESS, line, col)));
-                }
-            }
-            '>' => {
-                if let Some('=') = chars.get(i + 1) {
-                    tokens.push(Ok(Token::new_op(Operator::GREATEREQ, line, col)));
-                    i += 1;
-                    col += 1;
-                } else {
-                    tokens.push(Ok(Token::new_op(Operator::GREATER, line, col)));
-                }
-            }
-            '"' => {
-                let mut string = vec![];
-                let offset = string.len();
-                while chars.get(i + 1).map(|&char| char != '"').unwrap_or(false)
-                {
-                    string.push(*chars.get(i + 1).unwrap());
-                    i += 1;
-                }
-                let string: String = string.iter().collect();
-                if let Some('"') = chars.get(i + 1) {
-                    tokens.push(Ok(Token::new_str(string, line, col)));
-                    col += offset + 1;
-                    i += 1;
-                } else {
-                    tokens.push(Err(format!(
-                        "Unterminated string literal in line {} col {}",
-                        line, col
-                    )));
-                    col += string.len();
-                };
-            }
-            '0'..='9' => {
-                let mut number = vec![];
-                while chars
-                    .get(i)
-                    .map(|&char| char.is_numeric() || char == '.')
-                    .unwrap_or(false)
-                {
-                    number.push(*chars.get(i).unwrap());
-                    i += 1;
-                }
-                i -= 1;
-                let number: String = number.iter().collect();
-                if let Ok(number) = number.parse() {
-                    tokens.push(Ok(Token::new_num(number, line, col)));
-                } else {
-                    tokens.push(Err(format!("Invalid number in line {} col {}", line, col)));
-                }
-                col += number.len() - 1;
-            }
-            'a'..='z' | 'A'..='Z' | '_' => {
-                let mut word = vec![];
-                while chars
-                    .get(i)
-                    .map(|&char| char.is_alphanumeric() || char == '_')
-                    .unwrap_or(false)
-                {
-                    word.push(*chars.get(i).unwrap());
-                    i += 1
-                }
-                i -= 1;
-                let word: String = word.iter().collect();
-                let offset = word.len();
-                let token = match word.as_str() {
-                    "return" => Token::new_kw(Keyword::RETURN, line, col),
-                    "false" => Token::new_kw(Keyword::FALSE, line, col),
-                    "super" => Token::new_kw(Keyword::SUPER, line, col),
-                    "while" => Token::new_kw(Keyword::WHILE, line, col),
-                    "print" => Token::new_kw(Keyword::PRINT, line, col),
-                    "class" => Token::new_kw(Keyword::CLASS, line, col),
-                    "this" => Token::new_kw(Keyword::THIS, line, col),
-                    "true" => Token::new_kw(Keyword::TRUE, line, col),
-                    "else" => Token::new_kw(Keyword::ELSE, line, col),
-                    "var" => Token::new_kw(Keyword::VAR, line, col),
-                    "nil" => Token::new_kw(Keyword::NIL, line, col),
-                    "for" => Token::new_kw(Keyword::FOR, line, col),
-                    "and" => Token::new_kw(Keyword::AND, line, col),
-                    "fun" => Token::new_kw(Keyword::FUN, line, col),
-                    "or" => Token::new_kw(Keyword::OR, line, col),
-                    _ => Token::new_id(word, line, col),
-                };
-                tokens.push(Ok(token));
-                col += offset - 1;
-            }
-            '\t' => {
-                col += 4;
-                i += 1;
-                continue;
-            }
-            '\n' => {
-                line += 1;
-                col = 0;
-                i += 1;
-                continue;
-            }
-            _ => (),
+            '"' => tokenize_string(&mut program, ln),
+            '0'..='9' => tokenize_number(c, &mut program, ln),
+            'a'..='z' | 'A'..='Z' | '_' => tokenize_kwid(c, &mut program, ln),
+            _ => continue,
         };
-        i += 1;
-        col += 1;
     }
-    tokens.push(Ok(Token::EOF(line + 1, 0)));
-    tokens
+    lexemes
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_tokenize_string() {
-        let program = r#"var = "Hello World!""#;
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
-            Ok(Token::new_op(Operator::EQUAL, 0, 4)),
-            Ok(Token::new_str("Hello World!".to_string(), 0, 6)),
-            Ok(Token::EOF(1, 0)),
-        ];
-        assert_eq!(tokens, expected);
+fn tokenize_number<'a>(curr: char, rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
+    let mut number = String::new();
+    number.push(curr);
+    while let Some(&c) = rest.last() {
+        match c {
+            '0'..='9' | '.' => number.push(c),
+            _ => break,
+        }
+        rest.pop();
     }
-
-    #[test]
-    fn test_tokenize_arithmetic_expr() {
-        let program = "1.2 + 2 - 4;";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_num(1.2, 0, 0)),
-            Ok(Token::new_op(Operator::PLUS, 0, 4)),
-            Ok(Token::new_num(2.0, 0, 6)),
-            Ok(Token::new_op(Operator::MINUS, 0, 8)),
-            Ok(Token::new_num(4.0, 0, 10)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 0, 11)),
-            Ok(Token::EOF(1, 0)),
-        ];
-        assert_eq!(tokens, expected);
+    match number.parse::<f64>() {
+        Ok(number) => Ok(Lexeme::new(ln, Token::Number(number))),
+        Err(_) => Err(format!("Invalid number at line {}", ln)),
     }
+}
 
-    #[test]
-    fn test_tokenize_with_comments() {
-        let program = "// comment\nprint 1 + 2;";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::PRINT, 1, 0)),
-            Ok(Token::new_num(1.0, 1, 6)),
-            Ok(Token::new_op(Operator::PLUS, 1, 8)),
-            Ok(Token::new_num(2.0, 1, 10)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 11)),
-            Ok(Token::EOF(2, 0)),
-        ];
-        assert_eq!(tokens, expected);
+fn tokenize_string<'a>(rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
+    let mut string = String::new();
+    loop {
+        let c = rest.pop();
+        match c {
+            Some('"') => break,
+            Some(c) => string.push(c),
+            None => return Err(format!("Unterminated string at line {}", ln)),
+        }
     }
+    Ok(Lexeme::new(ln, Token::String(string)))
+}
 
-    #[test]
-    fn test_tokenize_with_tabs() {
-        let program = "\n\tprint 1 + 2;";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::PRINT, 1, 4)),
-            Ok(Token::new_num(1.0, 1, 10)),
-            Ok(Token::new_op(Operator::PLUS, 1, 12)),
-            Ok(Token::new_num(2.0, 1, 14)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 15)),
-            Ok(Token::EOF(2, 0)),
-        ];
-        assert_eq!(tokens, expected);
+fn tokenize_kwid<'a>(curr: char, rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
+    let mut kwid = String::new();
+    kwid.push(curr);
+    while let Some(&c) = rest.last() {
+        match c {
+            'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => kwid.push(c),
+            _ => break,
+        }
+        rest.pop();
     }
-
-    #[test]
-    fn test_tokenize_identifier() {
-        let program = "var a = b;\nprint a;";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
-            Ok(Token::new_id("a".to_string(), 0, 4)),
-            Ok(Token::new_op(Operator::EQUAL, 0, 6)),
-            Ok(Token::new_id("b".to_string(), 0, 8)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 0, 9)),
-            Ok(Token::new_kw(Keyword::PRINT, 1, 0)),
-            Ok(Token::new_id("a".to_string(), 1, 6)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 7)),
-            Ok(Token::EOF(2, 0)),
-        ];
-        assert_eq!(tokens, expected);
-    }
-
-    #[test]
-    fn test_tokenize_keywords() {
-        let program = "fun foo_o() {\n\tprint 1;\n}";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::FUN, 0, 0)),
-            Ok(Token::new_id("foo_o".to_string(), 0, 4)),
-            Ok(Token::new_punc(Punctuation::LPAREN, 0, 9)),
-            Ok(Token::new_punc(Punctuation::RPAREN, 0, 10)),
-            Ok(Token::new_punc(Punctuation::LBRACE, 0, 12)),
-            Ok(Token::new_kw(Keyword::PRINT, 1, 4)),
-            Ok(Token::new_num(1.0, 1, 10)),
-            Ok(Token::new_punc(Punctuation::SEMICOLON, 1, 11)),
-            Ok(Token::new_punc(Punctuation::RBRACE, 2, 0)),
-            Ok(Token::EOF(3, 0)),
-        ];
-        assert_eq!(tokens, expected);
-    }
-
-    #[test]
-    fn test_incomplete_string() {
-        let program = r#"var = "Hello World!"#;
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
-            Ok(Token::new_op(Operator::EQUAL, 0, 4)),
-            Err("Unterminated string literal in line 0 col 6".to_string()),
-            Ok(Token::EOF(1, 0)),
-        ];
-        assert_eq!(tokens, expected);
-    }
-
-    #[test]
-    fn test_invalid_number() {
-        let program = "var = 1.2.3;";
-        let tokens = tokenize(program);
-        let expected = vec![
-            Ok(Token::new_kw(Keyword::VAR, 0, 0)),
-            Ok(Token::new_op(Operator::EQUAL, 0, 4)),
-            Err("Invalid number in line 0 col 6".to_string()),
-            Ok(Token::EOF(1, 0)),
-        ];
-        assert_eq!(tokens, expected);
+    match kwid.as_str() {
+        "and" => Ok(Lexeme::new(ln, Token::And)),
+        "class" => Ok(Lexeme::new(ln, Token::Class)),
+        "else" => Ok(Lexeme::new(ln, Token::Else)),
+        "false" => Ok(Lexeme::new(ln, Token::False)),
+        "fun" => Ok(Lexeme::new(ln, Token::Fun)),
+        "for" => Ok(Lexeme::new(ln, Token::For)),
+        "if" => Ok(Lexeme::new(ln, Token::If)),
+        "nil" => Ok(Lexeme::new(ln, Token::Nil)),
+        "or" => Ok(Lexeme::new(ln, Token::Or)),
+        "print" => Ok(Lexeme::new(ln, Token::Print)),
+        "return" => Ok(Lexeme::new(ln, Token::Return)),
+        "super" => Ok(Lexeme::new(ln, Token::Super)),
+        "this" => Ok(Lexeme::new(ln, Token::This)),
+        "true" => Ok(Lexeme::new(ln, Token::True)),
+        "var" => Ok(Lexeme::new(ln, Token::Var)),
+        "while" => Ok(Lexeme::new(ln, Token::While)),
+        _ => Ok(Lexeme::new(ln, Token::Identifier(kwid))),
     }
 }
