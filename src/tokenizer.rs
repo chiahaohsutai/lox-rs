@@ -92,9 +92,16 @@ pub struct Lexeme {
     line: usize,
     token: Token,
 }
+
 impl Lexeme {
     fn new(line: usize, token: Token) -> Self {
         Self { line, token }
+    }
+    pub fn line(&self) -> usize {
+        self.line
+    }
+    pub fn token(&self) -> &Token {
+        &self.token
     }
 }
 
@@ -414,7 +421,7 @@ mod test {
         ];
         for (program, expected) in programs.iter().zip(expected.iter()) {
             assert_eq!(tokenize(program), expected.clone());
-        };
+        }
     }
 
     #[test]
