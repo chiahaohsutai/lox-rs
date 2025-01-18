@@ -88,7 +88,7 @@ impl std::fmt::Display for Token {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct Lexeme {
+pub struct Lexeme {
     line: usize,
     token: Token,
 }
@@ -104,7 +104,7 @@ impl std::fmt::Display for Lexeme {
     }
 }
 
-fn tokenize<'a, T: AsRef<str>>(program: T) -> Vec<Result<Lexeme, String>> {
+pub fn tokenize<'a, T: AsRef<str>>(program: T) -> Vec<Result<Lexeme, String>> {
     let mut program = program.as_ref().chars().rev().collect::<Vec<char>>();
     let mut lexemes = Vec::new();
     let mut ln = 0;
