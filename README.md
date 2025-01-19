@@ -5,7 +5,6 @@ Implementation of JLox from Robert Nystrom's book [Crafting Interpreters](https:
 ## What's JLox?
 
 JLox is a Java-based interpreter for the Lox programming language, developed in the first part of Robert Nystrom’s book Crafting Interpreters. This interpreter is implemented as a tree-walk interpreter, meaning it parses the source code into an abstract syntax tree (AST) and then directly interprets this tree to execute the program. Key feayures include:
-Key features include:
 - Variables and Scope: JLox allows the declaration of variables using the var keyword, supporting both global and local scopes. Variables can be assigned and reassigned, and their scope is determined by their placement within code blocks.
 - Control Flow Constructs: It includes standard control flow mechanisms such as if statements, while loops, and for loops, enabling complex logical structures and iterative processes.
 - Functions: JLox supports first-class functions, allowing the definition of reusable code blocks with the fun keyword. Functions can accept parameters, return values, and be passed as arguments to other functions.
