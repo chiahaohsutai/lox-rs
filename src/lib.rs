@@ -1,5 +1,6 @@
 mod tokenizer;
 mod parser;
+mod evaluate;
 
 pub fn interpret<T: AsRef<str>>(program: T) {
     let tokens = tokenizer::tokenize(program.as_ref());
