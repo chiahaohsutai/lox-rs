@@ -2,6 +2,9 @@ mod tokenizer;
 mod parser;
 mod evaluate;
 
+use std::collections::HashMap;
+use crate::evaluate::evaluate;
+
 pub fn interpret<T: AsRef<str>>(program: T) {
     let tokens = tokenizer::tokenize(program.as_ref());
     let has_errors = tokens.iter().any(|t| t.is_err());
@@ -18,7 +21,15 @@ pub fn interpret<T: AsRef<str>>(program: T) {
             for error in errors {
                 eprintln!("{}", error);
             }
-            std::process::exit(70)
+            std::process::exit(65)
+        }
+        let mut enviormnent = HashMap::new();
+        for statement in statements {
+            let result = evaluate(statement, &mut enviormnent);
+            if let Result::Err(e) = result {
+                eprintln!("{}", e);
+                std::process::exit(70)
+            }
         }
     };
 }
