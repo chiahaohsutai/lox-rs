@@ -251,4 +251,23 @@ mod test {
             Expression::Grouping(Box::new(Expression::Literal(Some(Literal::Number(3.0)))));
         assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
     }
+
+    #[test]
+    fn test_eval_var() {
+        let mut env = HashMap::new();
+        let expression = Expression::Variable("a".to_string());
+        env.insert("a".to_string(), Some(Literal::Number(3.0)));
+        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
+    }
+
+    #[test]
+    fn test_eval_var_stmt() {
+        let mut env = HashMap::new();
+        let stmt = Statement::Var(
+            "a".to_string(),
+            Some(Expression::Literal(Some(Literal::Number(3.0)))),
+        );
+        let _ = evaluate(stmt, &mut env);
+        assert_eq!(env.get("a"), Some(&Some(Literal::Number(3.0))));
+    }
 }
