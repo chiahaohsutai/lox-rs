@@ -14,8 +14,15 @@ impl Evaluate for Expression {
             Self::Grouping(expression) => expression.evaluate(enviorment),
             Self::Unary(op, right) => eval_unary_expr(op, *right, enviorment),
             Self::Binary(left, op, right) => eval_binary_expr(*left, op, *right, enviorment),
-            Self::Variable(name) => todo!(),
+            Self::Variable(name) => eval_var_expr(name, enviorment),
         }
+    }
+}
+
+fn eval_var_expr(name: String, enviorment: &HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
+    match enviorment.get(&name) {
+        Some(value) => Ok(value.clone()),
+        None => Err("Variable not found".to_string()),
     }
 }
 
