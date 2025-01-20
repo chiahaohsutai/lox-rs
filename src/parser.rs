@@ -38,7 +38,7 @@ pub enum Expression {
 pub enum Statement {
     Expression(Expression),
     Print(Expression),
-    Var(String, Expression),
+    Var(String, Option<Expression>),
 }
 
 pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
@@ -48,8 +48,12 @@ pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
 
     while let Some(lexeme) = tokens.pop() {
         let stmt = match lexeme.token() {
+            Token::Var => parse_var_stmt(&mut tokens, lexeme.line()),
             Token::Print => parse_print_stmt(&mut tokens, lexeme.line()),
-            _ => todo!(),
+            _ => {
+                tokens.push(lexeme);
+                parse_expression(&mut tokens).map(Statement::Expression)
+            },
         };
         match stmt {
             Ok(stmt) => statements.push(stmt),
@@ -79,6 +83,39 @@ fn synchronize(tokens: &mut Vec<Lexeme>) {
                 ()
             }
         }
+    }
+}
+
+fn parse_var_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    if let Some(lexeme) = tokens.pop() {
+        match lexeme.token() {
+            Token::Identifier(name) => {
+                match tokens.last() {
+                    Some(lexeme) if *lexeme.token() == Token::Equal => {
+                        tokens.pop();
+                        let expr = parse_expression(tokens)?;
+                        match tokens.last() {
+                            Some(lexeme) if *lexeme.token() == Token::Semicolon => {
+                                tokens.pop();
+                                Ok(Statement::Var(name.clone(), Some(expr)))
+                            }
+                            _ => Err(format!("Expected ';' in line {}", line)),
+                        }
+                    }
+                    Some(lexeme) if *lexeme.token() == Token::Semicolon => {
+                        tokens.pop();
+                        Ok(Statement::Var(name.clone(), None))
+                    }
+                    _ => {
+                        tokens.push(lexeme);
+                        Err(format!("Expected '=' or ';' in line {}", line))
+                    },
+                }
+            },
+            _ => Err(format!("Expected identifier in line {}", line)),
+        }
+    } else {
+        Err("Unexpected end of file".to_string())
     }
 }
 
