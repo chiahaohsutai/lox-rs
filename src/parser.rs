@@ -47,6 +47,9 @@ pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
     let mut errors = Vec::new();
 
     while let Some(lexeme) = tokens.pop() {
+        if let Token::Eof = lexeme.token() {
+            break;
+        };
         let stmt = match lexeme.token() {
             Token::Var => parse_var_stmt(&mut tokens, lexeme.line()),
             Token::Print => parse_print_stmt(&mut tokens, lexeme.line()),
