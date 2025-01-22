@@ -22,8 +22,12 @@ impl Evaluate for Expression {
 
 fn eval_assignment(name: String, expression: Expression, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
     let value = expression.evaluate(enviorment)?;
-    enviorment.insert(name, value);
-    Ok(None)
+    if enviorment.contains_key(name.as_str()) {
+        enviorment.insert(name, value.clone());
+    } else {
+        return Err("Variable not found".to_string());
+    }
+    Ok(value)
 }
 
 fn eval_var_expr(name: String, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
