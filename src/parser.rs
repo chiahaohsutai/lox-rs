@@ -33,6 +33,7 @@ pub enum Expression {
     Binary(Box<Expression>, BinaryOp, Box<Expression>),
     Grouping(Box<Expression>),
     Variable(String),
+    Assignment(String, Box<Expression>),
 }
 
 pub enum Statement {
@@ -50,12 +51,13 @@ pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
         if let Token::Eof = lexeme.token() {
             break;
         };
+        let line = lexeme.line();
         let stmt = match lexeme.token() {
-            Token::Var => parse_var_stmt(&mut tokens, lexeme.line()),
-            Token::Print => parse_print_stmt(&mut tokens, lexeme.line()),
+            Token::Var => parse_var_stmt(&mut tokens, line),
+            Token::Print => parse_print_stmt(&mut tokens, line),
             _ => {
                 tokens.push(lexeme);
-                parse_expression(&mut tokens).map(Statement::Expression)
+                parse_expr_stmt(&mut tokens, line)
             },
         };
         match stmt {
@@ -86,6 +88,17 @@ fn synchronize(tokens: &mut Vec<Lexeme>) {
                 ()
             }
         }
+    }
+}
+
+fn parse_expr_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    let expression = parse_expression(tokens)?;
+    match tokens.last() {
+        Some(lexeme) if *lexeme.token() == Token::Semicolon => {
+            tokens.pop();
+            Ok(Statement::Expression(expression))
+        }
+        _ => Err(format!("Expected semicolon in line {}", line)),
     }
 }
 
@@ -134,7 +147,21 @@ fn parse_print_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, 
 }
 
 fn parse_expression(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
-    parse_equality(tokens)
+    parse_assignment(tokens)
+}
+
+fn parse_assignment(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
+    let lhs = parse_equality(tokens)?;
+    if tokens.last().map(|t| t.token().clone()) == Some(Token::Equal) {
+        tokens.pop();
+        let rhs = Box::new(parse_assignment(tokens)?);
+        match lhs {
+            Expression::Variable(name) => Ok(Expression::Assignment(name, rhs)),
+            _ => Err("Invalid assignment target".to_string()),
+        }
+    } else {
+        Ok(lhs)
+    }
 }
 
 fn parse_equality(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
@@ -222,6 +249,7 @@ fn parse_primary(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
             Token::True => Ok(Expression::Literal(Some(Literal::Bool(true)))),
             Token::False => Ok(Expression::Literal(Some(Literal::Bool(false)))),
             Token::Nil => Ok(Expression::Literal(None)),
+            Token::Identifier(s) => Ok(Expression::Variable(s.clone())),
             Token::LeftParen => {
                 let expression = parse_expression(tokens)?;
                 match tokens.pop() {
@@ -231,7 +259,6 @@ fn parse_primary(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
                     _ => Err(format!("Expected ')' in line {}", lexeme.line())),
                 }
             }
-            Token::Identifier(s) => Ok(Expression::Variable(s.clone())),
             _ => Err(format!("Unexpected token in line {}", lexeme.line())),
         }
     } else {

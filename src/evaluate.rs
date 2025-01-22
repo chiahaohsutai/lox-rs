@@ -3,30 +3,37 @@ use crate::parser::{Expression, Literal, UnaryOp, BinaryOp, Statement};
 
 trait Evaluate {
     type Output;
-    fn evaluate(self, enviorment: &HashMap<String, Option<Literal>>) -> Self::Output;
+    fn evaluate(self, enviorment: &mut HashMap<String, Option<Literal>>) -> Self::Output;
 }
 
 impl Evaluate for Expression {
     type Output = Result<Option<Literal>, String>;
-    fn evaluate(self, enviorment: &HashMap<String, Option<Literal>>) -> Self::Output {
+    fn evaluate(self, enviorment: &mut HashMap<String, Option<Literal>>) -> Self::Output {
         match self {
             Self::Literal(literal) => Ok(literal),
             Self::Grouping(expression) => expression.evaluate(enviorment),
             Self::Unary(op, right) => eval_unary_expr(op, *right, enviorment),
             Self::Binary(left, op, right) => eval_binary_expr(*left, op, *right, enviorment),
             Self::Variable(name) => eval_var_expr(name, enviorment),
+            Self::Assignment(name, expression) => eval_assignment(name, *expression, enviorment),
         }
     }
 }
 
-fn eval_var_expr(name: String, enviorment: &HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
+fn eval_assignment(name: String, expression: Expression, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
+    let value = expression.evaluate(enviorment)?;
+    enviorment.insert(name, value);
+    Ok(None)
+}
+
+fn eval_var_expr(name: String, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
     match enviorment.get(&name) {
         Some(value) => Ok(value.clone()),
         None => Err("Variable not found".to_string()),
     }
 }
 
-fn eval_unary_expr(op: UnaryOp, right: Expression, enviorment: &HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
+fn eval_unary_expr(op: UnaryOp, right: Expression, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<Option<Literal>, String> {
     let right = right.evaluate(enviorment)?;
     match (op, right) {
         (UnaryOp::Minus, Some(Literal::Number(n))) => Ok(Some(Literal::Number(-n))),
@@ -42,7 +49,7 @@ fn eval_binary_expr(
     left: Expression,
     op: BinaryOp,
     right: Expression,
-    enviorment: &HashMap<String, Option<Literal>>
+    enviorment: &mut HashMap<String, Option<Literal>>
 ) -> Result<Option<Literal>, String> {
     let left = left.evaluate(enviorment)?;
     let right = right.evaluate(enviorment)?;
@@ -95,12 +102,12 @@ fn eval_var_stmt(
     Ok(())
 }
 
-fn eval_expr_stmt(expression: Expression, enviorment: &HashMap<String, Option<Literal>>) -> Result<(), String> {
+fn eval_expr_stmt(expression: Expression, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<(), String> {
     let _ = expression.evaluate(enviorment)?;
     Ok(())
 }
 
-fn eval_print_stmt(expression: Expression, enviorment: &HashMap<String, Option<Literal>>) -> Result<(), String> {
+fn eval_print_stmt(expression: Expression, enviorment: &mut HashMap<String, Option<Literal>>) -> Result<(), String> {
     let result = expression.evaluate(enviorment)?;
     match result {
         Some(Literal::Number(n)) => Ok(println!("{}", n)),
@@ -116,140 +123,140 @@ mod test {
 
     #[test]
     fn test_eval_addition() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(1.0)))),
             BinaryOp::Plus,
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(3.0))));
     }
 
     #[test]
     fn test_eval_subtraction() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(1.0)))),
             BinaryOp::Minus,
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(-1.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(-1.0))));
     }
 
     #[test]
     fn test_eval_multiplication() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
             BinaryOp::Star,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(6.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(6.0))));
     }
 
     #[test]
     fn test_eval_division() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(6.0)))),
             BinaryOp::Slash,
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(3.0))));
     }
 
     #[test]
     fn test_eval_greater() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::Greater,
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_greater_equal() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::GreaterEqual,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_less() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
             BinaryOp::Less,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_less_equal() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::LessEqual,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_equal_equal() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::EqualEqual,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_bang_equal() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::BangEqual,
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(true))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(true))));
     }
 
     #[test]
     fn test_eval_unary_minus() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Unary(
             UnaryOp::Minus,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(-3.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(-3.0))));
     }
 
     #[test]
     fn test_eval_unary_bang() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression = Expression::Unary(
             UnaryOp::Bang,
             Box::new(Expression::Literal(Some(Literal::Bool(true)))),
         );
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Bool(false))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Bool(false))));
     }
 
     #[test]
     fn test_eval_grouping() {
-        let env = HashMap::new();
+        let mut env = HashMap::new();
         let expression =
             Expression::Grouping(Box::new(Expression::Literal(Some(Literal::Number(3.0)))));
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(3.0))));
     }
 
     #[test]
@@ -257,7 +264,20 @@ mod test {
         let mut env = HashMap::new();
         let expression = Expression::Variable("a".to_string());
         env.insert("a".to_string(), Some(Literal::Number(3.0)));
-        assert_eq!(expression.evaluate(&env), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(expression.evaluate(&mut env), Ok(Some(Literal::Number(3.0))));
+    }
+
+    #[test]
+    fn test_assign_expr() {
+        let mut env = HashMap::new();
+        env.insert(String::from("a"), Some(Literal::Number(2.0)));
+        assert_eq!(env.get("a"), Some(&Some(Literal::Number(2.0))));
+        let expression = Expression::Assignment(
+            "a".to_string(),
+            Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
+        );
+        assert_eq!(expression.evaluate(&mut env), Ok(None));
+        assert_eq!(env.get("a"), Some(&Some(Literal::Number(3.0))));
     }
 
     #[test]
