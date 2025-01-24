@@ -3,16 +3,17 @@ mod parser;
 mod tokenizer;
 
 use crate::evaluate::evaluate;
-use crate::parser::Literal;
 use std::collections::HashMap;
 use std::default::Default;
+use std::fmt::Display;
+use std::hash::Hash;
 
-struct Enviorment {
-    parent: Option<Box<Enviorment>>,
-    values: HashMap<String, Option<Literal>>,
+struct Enviorment<K: Eq + Hash + Display, V: Clone> {
+    parent: Option<Box<Enviorment<K, V>>>,
+    values: HashMap<K, V>,
 }
 
-impl Default for Enviorment {
+impl <K: Eq + Hash + Display, V: Clone> Default for Enviorment<K, V> {
     fn default() -> Self {
         Self {
             parent: None,
@@ -21,21 +22,21 @@ impl Default for Enviorment {
     }
 }
 
-impl Enviorment {
-    fn new(parent: Enviorment) -> Self {
+impl <K: Eq + Hash + Display, V: Clone> Enviorment<K, V> {
+    fn new(parent: Enviorment<K, V>) -> Self {
         Self {
             parent: Some(Box::new(parent)),
             values: HashMap::new(),
         }
     }
 
-    fn define(&mut self, name: String, value: Option<Literal>) {
+    fn define(&mut self, name: K, value: V) {
         self.values.insert(name, value);
     }
 
-    fn assign(&mut self, name: String, value: Option<Literal>) -> Result<Option<Literal>, String> {
+    fn assign(&mut self, name: K, value: V) -> Result<Option<V>, String> {
         if self.values.contains_key(&name) {
-            Ok(self.values.insert(name, value).flatten())
+            Ok(self.values.insert(name, value))
         } else if let Some(parent) = &mut self.parent {
             Ok(parent.assign(name, value)?)
         } else {
@@ -43,7 +44,7 @@ impl Enviorment {
         }
     }
 
-    fn get(&self, name: String) -> Result<Option<Literal>, String> {
+    fn get(&self, name: K) -> Result<V, String> {
         if let Some(value) = self.values.get(&name) {
             Ok(value.clone())
         } else if let Some(parent) = &self.parent {
@@ -72,7 +73,7 @@ pub fn interpret<T: AsRef<str>>(program: T) {
             }
             std::process::exit(65)
         }
-        let mut enviormnent = HashMap::new();
+        let mut enviormnent = Enviorment::default();
         for statement in statements {
             let result = evaluate(statement, &mut enviormnent);
             if let Result::Err(e) = result {
@@ -86,6 +87,7 @@ pub fn interpret<T: AsRef<str>>(program: T) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Literal;
 
     #[test]
     fn test_env_get() {
@@ -100,7 +102,7 @@ mod tests {
         env.define("a".to_string(), Some(Literal::Number(1.0)));
         assert_eq!(
             env.assign("a".to_string(), Some(Literal::Number(2.0))),
-            Ok(Some(Literal::Number(1.0)))
+            Ok(Some(Some(Literal::Number(1.0))))
         );
         assert_eq!(env.get("a".to_string()), Ok(Some(Literal::Number(2.0))));
     }
@@ -123,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_env_get_undefined() {
-        let env = Enviorment::default();
+        let env: Enviorment<String, Option<Literal>> = Enviorment::default();
         assert_eq!(
             env.get("a".to_string()),
             Err("Undefined variable 'a'".to_string())
@@ -145,7 +147,7 @@ mod tests {
         let mut env = Enviorment::new(parent);
         assert_eq!(
             env.assign("a".to_string(), Some(Literal::Number(2.0))),
-            Ok(Some(Literal::Number(1.0)))
+            Ok(Some(Some(Literal::Number(1.0))))
         );
         assert_eq!(env.get("a".to_string()), Ok(Some(Literal::Number(2.0))));
     }
@@ -172,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_env_get_parent_undefined() {
-        let parent = Enviorment::default();
+        let parent: Enviorment<String, Option<Literal>> = Enviorment::default();
         let env = Enviorment::new(parent);
         assert_eq!(
             env.get("a".to_string()),
