@@ -120,7 +120,11 @@ fn eval_block_stmt(
 ) -> Result<(), String> {
     environment.push(HashMap::new());
     for stmt in stmts {
-        let _ = evaluate(*stmt, environment);
+        let result = evaluate(*stmt, environment);
+        if let Result::Err(e) = result {
+            environment.pop();
+            return Result::Err(e);
+        }
     }
     environment.pop();
     Ok(())
