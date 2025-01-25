@@ -40,6 +40,7 @@ pub enum Statement {
     Expression(Expression),
     Print(Expression),
     Var(String, Option<Expression>),
+    Block(Vec<Box<Statement>>),
 }
 
 pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
@@ -47,19 +48,11 @@ pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
     let mut statements = Vec::new();
     let mut errors = Vec::new();
 
-    while let Some(lexeme) = tokens.pop() {
-        if let Token::Eof = lexeme.token() {
+    while tokens.len() > 0 {
+        if let Token::Eof = tokens.last().unwrap().token() {
             break;
         };
-        let line = lexeme.line();
-        let stmt = match lexeme.token() {
-            Token::Var => parse_var_stmt(&mut tokens, line),
-            Token::Print => parse_print_stmt(&mut tokens, line),
-            _ => {
-                tokens.push(lexeme);
-                parse_expr_stmt(&mut tokens, line)
-            },
-        };
+        let stmt = parse_stmt(&mut tokens);
         match stmt {
             Ok(stmt) => statements.push(stmt),
             Err(err) => {
@@ -89,6 +82,40 @@ fn synchronize(tokens: &mut Vec<Lexeme>) {
             }
         }
     }
+}
+
+fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
+    let lexeme = tokens.pop();
+    match lexeme {
+        Some(lexeme) => {
+            let line = lexeme.line();
+            match lexeme.token() {
+                Token::Var => parse_var_stmt(tokens, line),
+                Token::Print => parse_print_stmt(tokens, line),
+                Token::LeftBrace => parse_block_stmt(tokens, line),
+                _ => {
+                    tokens.push(lexeme);
+                    parse_expr_stmt(tokens, line)
+                }
+            }
+        }
+        None => Err("Unexpected end of file".to_string()),
+    }
+}
+
+fn parse_block_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    let mut statements = Vec::new();
+    while let Some(lexeme) = tokens.last() {
+        if *lexeme.token() == Token::RightBrace {
+            tokens.pop();
+            return Ok(Statement::Block(statements));
+        }
+        match parse_stmt(tokens) {
+            Ok(stmt) => statements.push(Box::new(stmt)),
+            Err(err) => return Err(err),
+        }
+    };
+    Err(format!("Expected '}}' in line {}", line))
 }
 
 fn parse_expr_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
