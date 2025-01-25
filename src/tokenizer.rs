@@ -305,7 +305,7 @@ mod test {
     }
 
     #[test]
-    fn tokenize_kws_test() {
+    fn test_tokenize_kws() {
         let programs = vec![
             "print 1 + 2;",
             "b and c;",

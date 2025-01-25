@@ -110,8 +110,20 @@ pub fn evaluate(
         Statement::Var(name, expression) => eval_var_stmt(name, expression, environment),
         Statement::Expression(expression) => eval_expr_stmt(expression, environment),
         Statement::Print(expression) => eval_print_stmt(expression, environment),
-        Statement::Block(_) => todo!(),
+        Statement::Block(stmts) => eval_block_stmt(stmts, environment),
     }
+}
+
+fn eval_block_stmt(
+    stmts: Vec<Box<Statement>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
+) -> Result<(), String> {
+    environment.push(HashMap::new());
+    for stmt in stmts {
+        let _ = evaluate(*stmt, environment);
+    }
+    environment.pop();
+    Ok(())
 }
 
 fn eval_var_stmt(
@@ -358,6 +370,49 @@ mod test {
         assert_eq!(
             env[0].get(&String::from("a")),
             Some(&Some(Literal::Number(3.0)))
+        );
+    }
+
+    #[test]
+    fn test_block_stmt_scope() {
+        let mut env = vec![HashMap::new()];
+        let stmt = Statement::Block(vec![
+            Box::new(Statement::Var(
+                "a".to_string(),
+                Some(Expression::Literal(Some(Literal::Number(3.0)))),
+            )),
+            Box::new(Statement::Var(
+                "b".to_string(),
+                Some(Expression::Literal(Some(Literal::Number(2.0)))),
+            )),
+        ]);
+        let _ = evaluate(stmt, &mut env);
+        assert_eq!(env[0].get(&String::from("a")), None);
+        assert_eq!(env[0].get(&String::from("b")), None);
+    }
+
+    #[test]
+    fn text_block_stmt_with_assignments() {
+        let mut env = vec![HashMap::new()];
+        let var = Statement::Var(
+            "a".to_string(),
+            Some(Expression::Literal(Some(Literal::Number(3.0)))),
+        );
+        let stmt = Statement::Block(vec![Box::new(Statement::Expression(
+            Expression::Assignment(
+                "a".to_string(),
+                Box::new(Expression::Literal(Some(Literal::Number(4.0)))),
+            ),
+        ))]);
+        let _ = evaluate(var, &mut env);
+        assert_eq!(
+            env[0].get(&String::from("a")),
+            Some(&Some(Literal::Number(3.0)))
+        );
+        let _ = evaluate(stmt, &mut env);
+        assert_eq!(
+            env[0].get(&String::from("a")),
+            Some(&Some(Literal::Number(4.0)))
         );
     }
 }
