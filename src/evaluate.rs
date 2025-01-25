@@ -1,41 +1,61 @@
 use crate::parser::{BinaryOp, Expression, Literal, Statement, UnaryOp};
-use crate::Enviorment;
+use std::collections::HashMap;
 
-trait Evaluate {
+trait Evaluate<'a> {
     type Output;
-    fn evaluate(self, enviorment: &mut Enviorment<String, Option<Literal>>) -> Self::Output;
+    fn evaluate(self, environment: &mut Vec<HashMap<String, Option<Literal>>>) -> Self::Output;
 }
 
-impl Evaluate for Expression {
+impl<'a> Evaluate<'a> for Expression {
     type Output = Result<Option<Literal>, String>;
-    fn evaluate(self, enviorment: &mut Enviorment<String, Option<Literal>>) -> Self::Output {
+    fn evaluate(self, environment: &mut Vec<HashMap<String, Option<Literal>>>) -> Self::Output {
         match self {
             Self::Literal(literal) => Ok(literal),
-            Self::Grouping(expression) => expression.evaluate(enviorment),
-            Self::Unary(op, right) => eval_unary_expr(op, *right, enviorment),
-            Self::Binary(left, op, right) => eval_binary_expr(*left, op, *right, enviorment),
-            Self::Variable(name) => Ok(enviorment.get(name)?),
-            Self::Assignment(name, expression) => eval_assignment(name, *expression, enviorment),
+            Self::Grouping(expression) => expression.evaluate(environment),
+            Self::Unary(op, right) => eval_unary_expr(op, *right, environment),
+            Self::Binary(left, op, right) => eval_binary_expr(*left, op, *right, environment),
+            Self::Variable(name) => eval_var_expr(name, environment),
+            Self::Assignment(name, expression) => eval_assign_expr(name, *expression, environment),
         }
     }
 }
 
-fn eval_assignment(
+fn eval_var_expr(
+    name: String,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
+) -> Result<Option<Literal>, String> {
+    if let Some(values) = environment.last() {
+        if values.contains_key(&name) {
+            Ok(values.get(&name).unwrap().clone())
+        } else {
+            Err(format!("Undefined variable '{}'", name))
+        }
+    } else {
+        Err(format!("Undefined variable '{}'", name))
+    }
+}
+
+fn eval_assign_expr(
     name: String,
     expression: Expression,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<Option<Literal>, String> {
-    let value = expression.evaluate(enviorment)?;
-    enviorment.assign(name, value.clone())?;
-    Ok(value)
+    let value = expression.evaluate(environment)?;
+    for values in environment.iter_mut().rev() {
+        if values.contains_key(&name) {
+            values.insert(name, value.clone());
+            return Ok(value);
+        }
+    }
+    Err(format!("Undefined variable '{}'", name))
 }
 
 fn eval_unary_expr(
     op: UnaryOp,
     right: Expression,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<Option<Literal>, String> {
-    let right = right.evaluate(enviorment)?;
+    let right = right.evaluate(environment)?;
     match (op, right) {
         (UnaryOp::Minus, Some(Literal::Number(n))) => Ok(Some(Literal::Number(-n))),
         (UnaryOp::Bang, Some(Literal::Number(_))) => Ok(Some(Literal::Bool(false))),
@@ -50,10 +70,10 @@ fn eval_binary_expr(
     left: Expression,
     op: BinaryOp,
     right: Expression,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<Option<Literal>, String> {
-    let left = left.evaluate(enviorment)?;
-    let right = right.evaluate(enviorment)?;
+    let left = left.evaluate(environment)?;
+    let right = right.evaluate(environment)?;
     match (left, right) {
         (Some(Literal::Number(left)), Some(Literal::Number(right))) => match op {
             BinaryOp::Plus => Ok(Some(Literal::Number(left + right))),
@@ -84,41 +104,45 @@ fn eval_binary_expr(
 
 pub fn evaluate(
     stmt: Statement,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<(), String> {
     match stmt {
-        Statement::Var(name, expression) => eval_var_stmt(name, expression, enviorment),
-        Statement::Expression(expression) => eval_expr_stmt(expression, enviorment),
-        Statement::Print(expression) => eval_print_stmt(expression, enviorment),
+        Statement::Var(name, expression) => eval_var_stmt(name, expression, environment),
+        Statement::Expression(expression) => eval_expr_stmt(expression, environment),
+        Statement::Print(expression) => eval_print_stmt(expression, environment),
+        Statement::Block(_) => todo!(),
     }
 }
 
 fn eval_var_stmt(
     name: String,
     expression: Option<Expression>,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<(), String> {
     let value = match expression {
-        Some(expression) => expression.evaluate(enviorment)?,
+        Some(expression) => expression.evaluate(environment)?,
         None => None,
     };
-    enviorment.define(name, value);
+    // environment.define(name, value);
+    if let Some(values) = environment.last_mut() {
+        values.insert(name, value);
+    }
     Ok(())
 }
 
 fn eval_expr_stmt(
     expression: Expression,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<(), String> {
-    let _ = expression.evaluate(enviorment)?;
+    let _ = expression.evaluate(environment)?;
     Ok(())
 }
 
 fn eval_print_stmt(
     expression: Expression,
-    enviorment: &mut Enviorment<String, Option<Literal>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<(), String> {
-    let result = expression.evaluate(enviorment)?;
+    let result = expression.evaluate(environment)?;
     match result {
         Some(Literal::Number(n)) => Ok(println!("{}", n)),
         Some(Literal::String(s)) => Ok(println!("{}", s)),
@@ -133,7 +157,7 @@ mod test {
 
     #[test]
     fn test_eval_addition() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(1.0)))),
             BinaryOp::Plus,
@@ -147,7 +171,7 @@ mod test {
 
     #[test]
     fn test_eval_subtraction() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(1.0)))),
             BinaryOp::Minus,
@@ -161,7 +185,7 @@ mod test {
 
     #[test]
     fn test_eval_multiplication() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
             BinaryOp::Star,
@@ -175,7 +199,7 @@ mod test {
 
     #[test]
     fn test_eval_division() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(6.0)))),
             BinaryOp::Slash,
@@ -189,7 +213,7 @@ mod test {
 
     #[test]
     fn test_eval_greater() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::Greater,
@@ -200,7 +224,7 @@ mod test {
 
     #[test]
     fn test_eval_greater_equal() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::GreaterEqual,
@@ -211,7 +235,7 @@ mod test {
 
     #[test]
     fn test_eval_less() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(2.0)))),
             BinaryOp::Less,
@@ -222,7 +246,7 @@ mod test {
 
     #[test]
     fn test_eval_less_equal() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::LessEqual,
@@ -233,7 +257,7 @@ mod test {
 
     #[test]
     fn test_eval_equal_equal() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::EqualEqual,
@@ -244,7 +268,7 @@ mod test {
 
     #[test]
     fn test_eval_bang_equal() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Binary(
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
             BinaryOp::BangEqual,
@@ -255,7 +279,7 @@ mod test {
 
     #[test]
     fn test_eval_unary_minus() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Unary(
             UnaryOp::Minus,
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
@@ -268,7 +292,7 @@ mod test {
 
     #[test]
     fn test_eval_unary_bang() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Unary(
             UnaryOp::Bang,
             Box::new(Expression::Literal(Some(Literal::Bool(true)))),
@@ -281,7 +305,7 @@ mod test {
 
     #[test]
     fn test_eval_grouping() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression =
             Expression::Grouping(Box::new(Expression::Literal(Some(Literal::Number(3.0)))));
         assert_eq!(
@@ -292,9 +316,9 @@ mod test {
 
     #[test]
     fn test_eval_var() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let expression = Expression::Variable("a".to_string());
-        env.define("a".to_string(), Some(Literal::Number(3.0)));
+        env[0].insert("a".to_string(), Some(Literal::Number(3.0)));
         assert_eq!(
             expression.evaluate(&mut env),
             Ok(Some(Literal::Number(3.0)))
@@ -303,9 +327,12 @@ mod test {
 
     #[test]
     fn test_assign_expr() {
-        let mut env = Enviorment::default();
-        env.define(String::from("a"), Some(Literal::Number(2.0)));
-        assert_eq!(env.get(String::from("a")), Ok(Some(Literal::Number(2.0))));
+        let mut env = vec![HashMap::new()];
+        env[0].insert(String::from("a"), Some(Literal::Number(2.0)));
+        assert_eq!(
+            env[0].get(&String::from("a")),
+            Some(&Some(Literal::Number(2.0)))
+        );
         let expression = Expression::Assignment(
             "a".to_string(),
             Box::new(Expression::Literal(Some(Literal::Number(3.0)))),
@@ -314,17 +341,23 @@ mod test {
             expression.evaluate(&mut env),
             Ok(Some(Literal::Number(3.0)))
         );
-        assert_eq!(env.get(String::from("a")), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(
+            env[0].get(&String::from("a")),
+            Some(&Some(Literal::Number(3.0)))
+        );
     }
 
     #[test]
     fn test_eval_var_stmt() {
-        let mut env = Enviorment::default();
+        let mut env = vec![HashMap::new()];
         let stmt = Statement::Var(
             "a".to_string(),
             Some(Expression::Literal(Some(Literal::Number(3.0)))),
         );
         let _ = evaluate(stmt, &mut env);
-        assert_eq!(env.get(String::from("a")), Ok(Some(Literal::Number(3.0))));
+        assert_eq!(
+            env[0].get(&String::from("a")),
+            Some(&Some(Literal::Number(3.0)))
+        );
     }
 }
