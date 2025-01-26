@@ -41,6 +41,7 @@ pub enum Statement {
     Print(Expression),
     Var(String, Option<Expression>),
     Block(Vec<Box<Statement>>),
+    If(Expression, Box<Statement>, Option<Box<Statement>>),
 }
 
 pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
@@ -91,6 +92,7 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             let line = lexeme.line();
             match lexeme.token() {
                 Token::Var => parse_var_stmt(tokens, line),
+                Token::If => parse_if_stmt(tokens, line),
                 Token::Print => parse_print_stmt(tokens, line),
                 Token::LeftBrace => parse_block_stmt(tokens, line),
                 _ => {
@@ -100,6 +102,34 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             }
         }
         None => Err("Unexpected end of file".to_string()),
+    }
+}
+
+fn parse_if_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    if tokens.last().map(|t| t.token().clone()) == Some(Token::LeftParen) {
+        tokens.pop();
+        let condition = parse_expression(tokens)?;
+        if tokens.last().map(|t| t.token().clone()) == Some(Token::RightParen) {
+            tokens.pop();
+            let then_branch = Box::new(parse_stmt(tokens)?);
+            let else_branch = match tokens.last() {
+                Some(lexeme) if *lexeme.token() == Token::Else => {
+                    tokens.pop();
+                    Some(Box::new(parse_stmt(tokens)?))
+                }
+                _ => None,
+            };
+            if tokens.last().map(|t| t.token().clone()) == Some(Token::Semicolon) {
+                tokens.pop();
+                Ok(Statement::If(condition, then_branch, else_branch))
+            } else {
+                Err(format!("Expected ';' in line {}", line))
+            }
+        } else {
+            return Err(format!("Expected ')' in line {}", line));
+        }
+    } else {
+        Err(format!("Expected '(' in line {}", line))
     }
 }
 
@@ -114,7 +144,7 @@ fn parse_block_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, 
             Ok(stmt) => statements.push(Box::new(stmt)),
             Err(err) => return Err(err),
         }
-    };
+    }
     Err(format!("Expected '}}' in line {}", line))
 }
 
@@ -132,27 +162,25 @@ fn parse_expr_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, S
 fn parse_var_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
     if let Some(lexeme) = tokens.pop() {
         match lexeme.token() {
-            Token::Identifier(name) => {
-                match tokens.last() {
-                    Some(lexeme) if *lexeme.token() == Token::Equal => {
-                        tokens.pop();
-                        let expr = parse_expression(tokens)?;
-                        match tokens.last() {
-                            Some(lexeme) if *lexeme.token() == Token::Semicolon => {
-                                tokens.pop();
-                                Ok(Statement::Var(name.clone(), Some(expr)))
-                            }
-                            _ => Err(format!("Expected ';' in line {}", line)),
+            Token::Identifier(name) => match tokens.last() {
+                Some(lexeme) if *lexeme.token() == Token::Equal => {
+                    tokens.pop();
+                    let expr = parse_expression(tokens)?;
+                    match tokens.last() {
+                        Some(lexeme) if *lexeme.token() == Token::Semicolon => {
+                            tokens.pop();
+                            Ok(Statement::Var(name.clone(), Some(expr)))
                         }
+                        _ => Err(format!("Expected ';' in line {}", line)),
                     }
-                    Some(lexeme) if *lexeme.token() == Token::Semicolon => {
-                        tokens.pop();
-                        Ok(Statement::Var(name.clone(), None))
-                    }
-                    _ => {
-                        tokens.push(lexeme);
-                        Err(format!("Expected '=' or ';' in line {}", line))
-                    },
+                }
+                Some(lexeme) if *lexeme.token() == Token::Semicolon => {
+                    tokens.pop();
+                    Ok(Statement::Var(name.clone(), None))
+                }
+                _ => {
+                    tokens.push(lexeme);
+                    Err(format!("Expected '=' or ';' in line {}", line))
                 }
             },
             _ => Err(format!("Expected identifier in line {}", line)),
