@@ -1,4 +1,4 @@
-use crate::parser::{BinaryOp, Expression, Literal, Statement, UnaryOp};
+use crate::parser::{BinaryOp, Expression, Literal, LogicalOp, Statement, UnaryOp};
 use std::collections::HashMap;
 
 trait Evaluate<'a> {
@@ -16,8 +16,28 @@ impl<'a> Evaluate<'a> for Expression {
             Self::Binary(left, op, right) => eval_binary_expr(*left, op, *right, environment),
             Self::Variable(name) => eval_var_expr(name, environment),
             Self::Assignment(name, expression) => eval_assign_expr(name, *expression, environment),
+            Self::Logical(lhs, op, rhs) => eval_logical_expr(lhs, op, rhs, environment),
         }
     }
+}
+
+fn eval_logical_expr(
+    lhs: Box<Expression>,
+    op: LogicalOp,
+    rhs: Box<Expression>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
+) -> Result<Option<Literal>, String> {
+    let lhs = lhs.evaluate(environment)?;
+    if op == LogicalOp::Or {
+        if let Some(Literal::Bool(true)) = lhs {
+            return Ok(lhs);
+        }
+    } else {
+        if let Some(Literal::Bool(false)) = lhs {
+            return Ok(lhs);
+        }
+    }
+    rhs.evaluate(environment)
 }
 
 fn eval_var_expr(

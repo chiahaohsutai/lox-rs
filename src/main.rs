@@ -2,8 +2,8 @@ use lox_rs::interpret;
 
 fn main() {
     let lines = vec![
-        "var a = 1;",
-        "var b = -1;",
+        "var a = 2.7;",
+        "var b = 0 and 3;",
         "if (a > b) {",
         "  print a;",
         "} else {",
@@ -11,6 +11,6 @@ fn main() {
         "};",
     ];
     let program = lines.join("\n");
-    println!("{}", program);
+    println!("===start\n\n{}\n\n===end\n", program);
     interpret(program);
 }
