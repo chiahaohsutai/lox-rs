@@ -6,6 +6,12 @@ pub enum UnaryOp {
     Bang,
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub enum LogicalOp {
+    And,
+    Or,
+}
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum BinaryOp {
     Plus,
@@ -34,6 +40,7 @@ pub enum Expression {
     Grouping(Box<Expression>),
     Variable(String),
     Assignment(String, Box<Expression>),
+    Logical(Box<Expression>, LogicalOp, Box<Expression>),
 }
 
 pub enum Statement {
@@ -206,7 +213,7 @@ fn parse_expression(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
 }
 
 fn parse_assignment(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
-    let lhs = parse_equality(tokens)?;
+    let lhs = parse_logical_or(tokens)?;
     if tokens.last().map(|t| t.token().clone()) == Some(Token::Equal) {
         tokens.pop();
         let rhs = Box::new(parse_assignment(tokens)?);
@@ -217,6 +224,26 @@ fn parse_assignment(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
     } else {
         Ok(lhs)
     }
+}
+
+fn parse_logical_or(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
+    let mut expression = parse_logical_and(tokens)?;
+    while tokens.last().map(|t| t.token().clone()) == Some(Token::Or) {
+        tokens.pop();
+        let right = Box::new(parse_logical_and(tokens)?);
+        expression = Expression::Logical(Box::new(expression), LogicalOp::Or, right);
+    };
+    Ok(expression)
+}
+
+fn parse_logical_and(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
+    let mut expression = parse_equality(tokens)?;
+    while tokens.last().map(|t| t.token().clone()) == Some(Token::And) {
+        tokens.pop();
+        let right = Box::new(parse_equality(tokens)?);
+        expression = Expression::Logical(Box::new(expression), LogicalOp::And, right);
+    };
+    Ok(expression)
 }
 
 fn parse_equality(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
