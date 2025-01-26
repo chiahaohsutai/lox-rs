@@ -33,6 +33,7 @@ pub enum Literal {
     Bool(bool),
 }
 
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
     Literal(Option<Literal>),
     Unary(UnaryOp, Box<Expression>),
@@ -43,12 +44,14 @@ pub enum Expression {
     Logical(Box<Expression>, LogicalOp, Box<Expression>),
 }
 
+#[derive(PartialEq, Debug, Clone)]
 pub enum Statement {
     Expression(Expression),
     Print(Expression),
     Var(String, Option<Expression>),
     Block(Vec<Box<Statement>>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
+    While(Expression, Box<Statement>),
 }
 
 pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
@@ -101,6 +104,7 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
                 Token::Var => parse_var_stmt(tokens, line),
                 Token::If => parse_if_stmt(tokens, line),
                 Token::Print => parse_print_stmt(tokens, line),
+                Token::While => parse_while_stmt(tokens, line),
                 Token::LeftBrace => parse_block_stmt(tokens, line),
                 _ => {
                     tokens.push(lexeme);
@@ -109,6 +113,27 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             }
         }
         None => Err("Unexpected end of file".to_string()),
+    }
+}
+
+fn parse_while_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    if tokens.last().map(|t| t.token()) == Some(&Token::LeftParen) {
+        tokens.pop();
+        let condition = parse_expression(tokens)?;
+        if tokens.last().map(|t| t.token()) == Some(&Token::RightParen) {
+            tokens.pop();
+            let body = Box::new(parse_stmt(tokens)?);
+            if tokens.last().map(|t| t.token()) == Some(&Token::Semicolon) {
+                tokens.pop();
+                Ok(Statement::While(condition, body))
+            } else {
+                Err(format!("Expected ';' in line {}", line))
+            }
+        } else {
+            Err(format!("Expected ')' in line {}", line))
+        }
+    } else {
+        Err(format!("Expected '(' in line {}", line))
     }
 }
 

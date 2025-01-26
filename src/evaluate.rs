@@ -48,7 +48,7 @@ fn eval_var_expr(
         if let Some(value) = env.get(&name) {
             return Ok(value.clone());
         }
-    };
+    }
     Err(format!("Undefined variable '{}'", name))
 }
 
@@ -128,10 +128,22 @@ pub fn evaluate(
         Statement::Expression(expression) => eval_expr_stmt(expression, environment),
         Statement::Print(expression) => eval_print_stmt(expression, environment),
         Statement::Block(stmts) => eval_block_stmt(stmts, environment),
+        Statement::While(condition, body) => eval_while_stmt(condition, body, environment),
         Statement::If(condition, then_branch, else_branch) => {
             eval_if_stmt(condition, then_branch, else_branch, environment)
         }
     }
+}
+
+fn eval_while_stmt(
+    condition: Expression,
+    body: Box<Statement>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
+) -> Result<(), String> {
+    while let Some(Literal::Bool(true)) = condition.clone().evaluate(environment)? {
+        evaluate(*body.clone(), environment)?;
+    }
+    Ok(())
 }
 
 fn eval_if_stmt(
