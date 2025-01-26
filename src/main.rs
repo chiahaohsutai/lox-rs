@@ -3,13 +3,14 @@ use lox_rs::interpret;
 fn main() {
     let lines = vec![
         "var a = 1;",
-        "print a = 2;",
-        "{",
-        "var a = 3;",
-        "print a;",
-        "}",
-        "print a;",
+        "var b = -1;",
+        "if (a > b) {",
+        "  print a;",
+        "} else {",
+        "  print b;",
+        "};",
     ];
     let program = lines.join("\n");
+    println!("{}", program);
     interpret(program);
 }

@@ -24,15 +24,12 @@ fn eval_var_expr(
     name: String,
     environment: &mut Vec<HashMap<String, Option<Literal>>>,
 ) -> Result<Option<Literal>, String> {
-    if let Some(values) = environment.last() {
-        if values.contains_key(&name) {
-            Ok(values.get(&name).unwrap().clone())
-        } else {
-            Err(format!("Undefined variable '{}'", name))
+    for env in environment.iter().rev() {
+        if let Some(value) = env.get(&name) {
+            return Ok(value.clone());
         }
-    } else {
-        Err(format!("Undefined variable '{}'", name))
-    }
+    };
+    Err(format!("Undefined variable '{}'", name))
 }
 
 fn eval_assign_expr(
@@ -47,7 +44,7 @@ fn eval_assign_expr(
             return Ok(value);
         }
     }
-    Err(format!("Undefined variable '{}'", name))
+    Err(format!("Undefined variable '{}' during assignment", name))
 }
 
 fn eval_unary_expr(
@@ -111,6 +108,29 @@ pub fn evaluate(
         Statement::Expression(expression) => eval_expr_stmt(expression, environment),
         Statement::Print(expression) => eval_print_stmt(expression, environment),
         Statement::Block(stmts) => eval_block_stmt(stmts, environment),
+        Statement::If(condition, then_branch, else_branch) => {
+            eval_if_stmt(condition, then_branch, else_branch, environment)
+        }
+    }
+}
+
+fn eval_if_stmt(
+    condition: Expression,
+    then_branch: Box<Statement>,
+    else_branch: Option<Box<Statement>>,
+    environment: &mut Vec<HashMap<String, Option<Literal>>>,
+) -> Result<(), String> {
+    let condition = condition.evaluate(environment)?;
+    match condition {
+        Some(Literal::Bool(true)) => evaluate(*then_branch, environment),
+        Some(Literal::Bool(false)) => {
+            if let Some(else_branch) = else_branch {
+                evaluate(*else_branch, environment)
+            } else {
+                Ok(())
+            }
+        }
+        _ => Err("Invalid if condition".to_string()),
     }
 }
 
