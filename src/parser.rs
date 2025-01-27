@@ -105,6 +105,7 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
                 Token::If => parse_if_stmt(tokens, line),
                 Token::Print => parse_print_stmt(tokens, line),
                 Token::While => parse_while_stmt(tokens, line),
+                Token::For => parse_for_stmt(tokens, line),
                 Token::LeftBrace => parse_block_stmt(tokens, line),
                 _ => {
                     tokens.push(lexeme);
@@ -113,6 +114,58 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             }
         }
         None => Err("Unexpected end of file".to_string()),
+    }
+}
+
+fn parse_for_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    if tokens.last().map(|t| t.token()) == Some(&Token::LeftParen) {
+        tokens.pop();
+        let initializer = match tokens.pop() {
+            Some(lexeme) if *lexeme.token() == Token::Semicolon => None,
+            Some(lexeme) if *lexeme.token() == Token::Var => Some(parse_var_stmt(tokens, line)?),
+            Some(_) => Some(parse_expr_stmt(tokens, line)?),
+            None => return Err("Unexpected end of file".to_string()),
+        };
+        let mut condition = match tokens.last() {
+            Some(lexeme) if *lexeme.token() == Token::Semicolon => None,
+            Some(_) => Some(parse_expression(tokens)?),
+            None => return Err("Unexpected end of file".to_string()),
+        };
+        if tokens.last().map(|t| t.token()) == Some(&Token::Semicolon) {
+            tokens.pop();
+            let increment = match tokens.last() {
+                Some(lexeme) if *lexeme.token() == Token::RightParen => None,
+                Some(_) => Some(Box::new(parse_expression(tokens)?)),
+                None => return Err("Unexpected end of file".to_string()),
+            };
+            if tokens.last().map(|t| t.token()) == Some(&Token::RightParen) {
+                tokens.pop();
+                let mut body = parse_stmt(tokens)?;
+                if increment.is_some() {
+                    body = Statement::Block(vec![
+                        Box::new(body),
+                        Box::new(Statement::Expression(*increment.unwrap())),
+                    ]);
+                }
+                if condition.is_none() {
+                    condition = Some(Expression::Literal(Some(Literal::Bool(true))));
+                }
+                body = Statement::While(condition.unwrap(), Box::new(body));
+                if initializer.is_some() {
+                    return Ok(Statement::Block(vec![
+                        Box::new(initializer.unwrap()),
+                        Box::new(body),
+                    ]));
+                }
+                Ok(body)
+            } else {
+                Err(format!("Expected ')' in line {}", line))
+            }
+        } else {
+            Err(format!("Expected ';' in line {}", line))
+        }
+    } else {
+        Err(format!("Expected '(' in line {}", line))
     }
 }
 
@@ -257,7 +310,7 @@ fn parse_logical_or(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
         tokens.pop();
         let right = Box::new(parse_logical_and(tokens)?);
         expression = Expression::Logical(Box::new(expression), LogicalOp::Or, right);
-    };
+    }
     Ok(expression)
 }
 
@@ -267,7 +320,7 @@ fn parse_logical_and(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
         tokens.pop();
         let right = Box::new(parse_equality(tokens)?);
         expression = Expression::Logical(Box::new(expression), LogicalOp::And, right);
-    };
+    }
     Ok(expression)
 }
 
@@ -366,7 +419,11 @@ fn parse_primary(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
                     _ => Err(format!("Expected ')' in line {}", lexeme.line())),
                 }
             }
-            _ => Err(format!("Unexpected token in line {}", lexeme.line())),
+            _ => Err(format!(
+                "Unexpected token {} in line {}",
+                lexeme.token(),
+                lexeme.line(),
+            )),
         }
     } else {
         Err("Unexpected end of file".to_string())

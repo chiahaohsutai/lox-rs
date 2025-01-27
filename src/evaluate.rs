@@ -1,12 +1,12 @@
 use crate::parser::{BinaryOp, Expression, Literal, LogicalOp, Statement, UnaryOp};
 use std::collections::HashMap;
 
-trait Evaluate<'a> {
+trait Evaluate {
     type Output;
     fn evaluate(self, environment: &mut Vec<HashMap<String, Option<Literal>>>) -> Self::Output;
 }
 
-impl<'a> Evaluate<'a> for Expression {
+impl Evaluate for Expression {
     type Output = Result<Option<Literal>, String>;
     fn evaluate(self, environment: &mut Vec<HashMap<String, Option<Literal>>>) -> Self::Output {
         match self {

@@ -13,8 +13,10 @@ fn main() {
         "  print a;",
         "  a = a - 1;",
         "};",
+        "for (var i = 0; i < 10; i = i + 1) {",
+        "  print i;",
+        "}",
     ];
     let program = lines.join("\n");
-    println!("===start\n\n{}\n\n===end\n", program);
     interpret(program);
 }
