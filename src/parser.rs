@@ -42,6 +42,7 @@ pub enum Expression {
     Variable(String),
     Assignment(String, Box<Expression>),
     Logical(Box<Expression>, LogicalOp, Box<Expression>),
+    Call(Box<Expression>, Vec<Expression>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -391,13 +392,50 @@ fn parse_unary(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
         let op = match lexeme.token() {
             Token::Minus => UnaryOp::Minus,
             Token::Bang => UnaryOp::Bang,
-            _ => return parse_primary(tokens),
+            _ => return parse_call(tokens),
         };
         tokens.pop();
         let right = Box::new(parse_unary(tokens)?);
         Ok(Expression::Unary(op, right))
     } else {
-        parse_primary(tokens)
+        parse_call(tokens)
+    }
+}
+
+fn parse_call(tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
+    let mut expression = parse_primary(tokens)?;
+    loop {
+        if tokens.last().map(|t| t.token().clone()) == Some(Token::LeftParen) {
+            tokens.pop();
+            expression = parse_arguments(expression, tokens)?;
+        } else {
+            break;
+        }
+    };
+    Ok(expression)
+}
+
+fn parse_arguments(callee: Expression, tokens: &mut Vec<Lexeme>) -> Result<Expression, String> {
+    let mut arguments = Vec::new();
+    if tokens.last().map(|t| t.token().clone()) != Some(Token::RightParen) {
+        tokens.pop();
+        loop {
+            arguments.push(parse_expression(tokens)?);
+            if tokens.last().map(|t| t.token().clone()) == Some(Token::Comma) {
+                tokens.pop();
+            } else {
+                break;
+            }
+        };
+        if tokens.last().map(|t| t.token().clone()) != Some(Token::RightParen) {
+            return Err("Expected ')'".to_string());
+        } else {
+            tokens.pop();
+            Ok(Expression::Call(Box::new(callee), arguments))
+        }
+    } else {
+        tokens.pop();
+        Ok(Expression::Call(Box::new(callee), arguments))
     }
 }
 

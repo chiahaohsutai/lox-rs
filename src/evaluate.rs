@@ -17,6 +17,7 @@ impl Evaluate for Expression {
             Self::Variable(name) => eval_var_expr(name, environment),
             Self::Assignment(name, expression) => eval_assign_expr(name, *expression, environment),
             Self::Logical(lhs, op, rhs) => eval_logical_expr(lhs, op, rhs, environment),
+            Self::Call(callee, args) => todo!(),
         }
     }
 }
