@@ -139,6 +139,7 @@ pub fn evaluate(
 ) -> Result<(), String> {
     match stmt {
         Statement::Var(name, expression) => eval_var_stmt(name, expression, environment),
+        Statement::Function(name, args, body) => todo!(),
         Statement::Expression(expression) => eval_expr_stmt(expression, environment),
         Statement::Print(expression) => eval_print_stmt(expression, environment),
         Statement::Block(stmts) => eval_block_stmt(stmts, environment),

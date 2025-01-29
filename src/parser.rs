@@ -53,6 +53,7 @@ pub enum Statement {
     Block(Vec<Box<Statement>>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
+    Function(String, Vec<String>, Vec<Box<Statement>>),
 }
 
 pub fn parse(tokens: Vec<Lexeme>) -> (Vec<Statement>, Vec<String>) {
@@ -103,6 +104,7 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             let line = lexeme.line();
             match lexeme.token() {
                 Token::Var => parse_var_stmt(tokens, line),
+                Token::Fun => parse_fun_stmt(tokens, line),
                 Token::If => parse_if_stmt(tokens, line),
                 Token::Print => parse_print_stmt(tokens, line),
                 Token::While => parse_while_stmt(tokens, line),
@@ -115,6 +117,51 @@ fn parse_stmt(tokens: &mut Vec<Lexeme>) -> Result<Statement, String> {
             }
         }
         None => Err("Unexpected end of file".to_string()),
+    }
+}
+
+fn parse_fun_stmt(tokens: &mut Vec<Lexeme>, line: usize) -> Result<Statement, String> {
+    if let Some(Token::Identifier(i)) = tokens.last().map(|t| t.token().clone()) {
+        tokens.pop();
+        let name = i.clone();
+        if tokens.last().map(|t| t.token()) == Some(&Token::LeftParen) {
+            tokens.pop();
+            if tokens.last().map(|t| t.token()) != Some(&Token::RightParen) {
+                let mut arguments = vec![];
+                loop {
+                    match tokens.pop() {
+                        Some(lexeme) => match lexeme.token() {
+                            Token::Identifier(i) => arguments.push(i.clone()),
+                            Token::RightParen => break,
+                            Token::Comma => (),
+                            _ => return Err(format!("Expected identifier in line {}", line)),
+                        },
+                        None => return Err("Unexpected end of file".to_string()),
+                    };
+                };
+                if let Some(Token::LeftBrace) = tokens.last().map(|t| t.token()) {
+                    tokens.pop();
+                    let body = parse_block_stmt(tokens, line)?;
+                    let body = match body {
+                        Statement::Block(stmts) => stmts,
+                        _ => unreachable!(),
+                    };
+                    if let Some(Token::RightParen) = tokens.last().map(|t| t.token()) {
+                        Ok(Statement::Function(name, arguments, body))
+                    } else {
+                        Err(format!("Expected ')' in line {}", line))
+                    }
+                } else {
+                    return Err(format!("Expected '{{' in line {}", line));
+                }
+            } else {
+                Err(format!("Expected ')' in line {}", line))
+            }
+        } else {
+            return Err(format!("Expected '(' in line {}", line));
+        }
+    } else {
+        Err(format!("Expected identifier in line {}", line))
     }
 }
 
