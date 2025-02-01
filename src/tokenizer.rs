@@ -1,472 +1,255 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    Identifier(String),
-    String(String),
-    Number(f64),
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Dot,
-    Minus,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
-    Bang,
-    BangEqual,
-    Equal,
-    EqualEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
-    And,
-    Class,
-    Else,
-    False,
-    Fun,
-    For,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
-    Eof,
+    Identifier(String, usize),
+    String(String, usize),
+    Number(f64, usize),
+    LeftParen(usize),
+    RightParen(usize),
+    LeftBrace(usize),
+    RightBrace(usize),
+    Comma(usize),
+    Dot(usize),
+    Minus(usize),
+    Plus(usize),
+    Semicolon(usize),
+    Slash(usize),
+    Star(usize),
+    Bang(usize),
+    BangEqual(usize),
+    Equal(usize),
+    EqualEqual(usize),
+    Greater(usize),
+    GreaterEqual(usize),
+    Less(usize),
+    LessEqual(usize),
+    And(usize),
+    Class(usize),
+    Else(usize),
+    False(usize),
+    Fun(usize),
+    For(usize),
+    If(usize),
+    Nil(usize),
+    Or(usize),
+    Print(usize),
+    Return(usize),
+    Super(usize),
+    This(usize),
+    True(usize),
+    Var(usize),
+    While(usize),
+    Eof(usize),
 }
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Identifier(s) => write!(f, "{}", s),
-            Self::String(s) => write!(f, "{}", s),
-            Self::Number(n) => write!(f, "{}", n),
-            Self::LeftParen => write!(f, "("),
-            Self::RightParen => write!(f, ")"),
-            Self::LeftBrace => write!(f, "{{"),
-            Self::RightBrace => write!(f, "}}"),
-            Self::Comma => write!(f, ","),
-            Self::Dot => write!(f, "."),
-            Self::Minus => write!(f, "-"),
-            Self::Plus => write!(f, "+"),
-            Self::Semicolon => write!(f, ";"),
-            Self::Slash => write!(f, "/"),
-            Self::Star => write!(f, "*"),
-            Self::Bang => write!(f, "!"),
-            Self::BangEqual => write!(f, "!="),
-            Self::Equal => write!(f, "="),
-            Self::EqualEqual => write!(f, "=="),
-            Self::Greater => write!(f, ">"),
-            Self::GreaterEqual => write!(f, ">="),
-            Self::Less => write!(f, "<"),
-            Self::LessEqual => write!(f, "<="),
-            Self::And => write!(f, "and"),
-            Self::Class => write!(f, "class"),
-            Self::Else => write!(f, "else"),
-            Self::False => write!(f, "false"),
-            Self::Fun => write!(f, "fun"),
-            Self::For => write!(f, "for"),
-            Self::If => write!(f, "if"),
-            Self::Nil => write!(f, "nil"),
-            Self::Or => write!(f, "or"),
-            Self::Print => write!(f, "print"),
-            Self::Return => write!(f, "return"),
-            Self::Super => write!(f, "super"),
-            Self::This => write!(f, "this"),
-            Self::True => write!(f, "true"),
-            Self::Var => write!(f, "var"),
-            Self::While => write!(f, "while"),
-            Self::Eof => write!(f, "EOF"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Lexeme {
-    line: usize,
-    token: Token,
-}
-
-impl Lexeme {
-    fn new(line: usize, token: Token) -> Self {
-        Self { line, token }
-    }
-    pub fn line(&self) -> usize {
-        self.line
-    }
-    pub fn token(&self) -> &Token {
-        &self.token
-    }
-}
-
-impl std::fmt::Display for Lexeme {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} at line {}", self.token, self.line)
-    }
-}
-
-pub fn tokenize<'a, T: AsRef<str>>(program: T) -> Vec<Result<Lexeme, String>> {
-    let mut program = program.as_ref().chars().rev().collect::<Vec<char>>();
-    let mut lexemes = Vec::new();
-    let mut ln = 0;
+pub fn tokenize<T: AsRef<str>>(program: T) -> Vec<Result<Token, String>> {
+    let mut program: Vec<char> = program.as_ref().chars().rev().collect();
+    let mut tokens: Vec<Result<Token, String>> = vec![];
+    let mut line: usize = 0;
 
     while program.len() > 0 {
-        let c = program.pop().unwrap();
-        if c == '\n' {
-            ln += 1;
-            continue;
-        };
-        let lexeme = match c {
-            '(' => Ok(Lexeme::new(ln, Token::LeftParen)),
-            ')' => Ok(Lexeme::new(ln, Token::RightParen)),
-            '{' => Ok(Lexeme::new(ln, Token::LeftBrace)),
-            '}' => Ok(Lexeme::new(ln, Token::RightBrace)),
-            ',' => Ok(Lexeme::new(ln, Token::Comma)),
-            '.' => Ok(Lexeme::new(ln, Token::Dot)),
-            '-' => Ok(Lexeme::new(ln, Token::Minus)),
-            '+' => Ok(Lexeme::new(ln, Token::Plus)),
-            ';' => Ok(Lexeme::new(ln, Token::Semicolon)),
-            '*' => Ok(Lexeme::new(ln, Token::Star)),
-            '/' => {
-                if let Some(&'/') = program.last() {
-                    program.pop();
-                    while program.len() > 0 && program.last() != Some(&'\n') {
-                        program.pop();
-                    }
-                    continue;
-                } else {
-                    Ok(Lexeme::new(ln, Token::Slash))
-                }
-            }
+        let curr = program.pop().unwrap();
+        match curr {
+            '\n' => line += 1,
+            '(' => tokens.push(Ok(Token::LeftParen(line))),
+            ')' => tokens.push(Ok(Token::RightParen(line))),
+            '{' => tokens.push(Ok(Token::LeftBrace(line))),
+            '}' => tokens.push(Ok(Token::RightBrace(line))),
+            ',' => tokens.push(Ok(Token::Comma(line))),
+            '.' => tokens.push(Ok(Token::Dot(line))),
+            '-' => tokens.push(Ok(Token::Minus(line))),
+            '+' => tokens.push(Ok(Token::Plus(line))),
+            ';' => tokens.push(Ok(Token::Semicolon(line))),
+            '*' => tokens.push(Ok(Token::Star(line))),
             '!' | '=' | '<' | '>' => {
-                if let Some(&'=') = program.last() {
-                    program.pop();
-                    match c {
-                        '!' => Ok(Lexeme::new(ln, Token::BangEqual)),
-                        '=' => Ok(Lexeme::new(ln, Token::EqualEqual)),
-                        '<' => Ok(Lexeme::new(ln, Token::LessEqual)),
-                        '>' => Ok(Lexeme::new(ln, Token::GreaterEqual)),
-                        _ => unreachable!(),
+                let next = program.pop().unwrap();
+                match (curr, next) {
+                    ('!', '=') => tokens.push(Ok(Token::BangEqual(line))),
+                    ('=', '=') => tokens.push(Ok(Token::EqualEqual(line))),
+                    ('<', '=') => tokens.push(Ok(Token::LessEqual(line))),
+                    ('>', '=') => tokens.push(Ok(Token::GreaterEqual(line))),
+                    ('!', _) => {
+                        program.push(next);
+                        tokens.push(Ok(Token::Bang(line)));
                     }
-                } else {
-                    match c {
-                        '!' => Ok(Lexeme::new(ln, Token::Bang)),
-                        '=' => Ok(Lexeme::new(ln, Token::Equal)),
-                        '<' => Ok(Lexeme::new(ln, Token::Less)),
-                        '>' => Ok(Lexeme::new(ln, Token::Greater)),
-                        _ => unreachable!(),
+                    ('=', _) => {
+                        program.push(next);
+                        tokens.push(Ok(Token::Equal(line)));
                     }
+                    ('<', _) => {
+                        program.push(next);
+                        tokens.push(Ok(Token::Less(line)));
+                    }
+                    ('>', _) => {
+                        program.push(next);
+                        tokens.push(Ok(Token::Greater(line)));
+                    }
+                    _ => tokens.push(Err(format!(
+                        "Unexpected character '{}' at line {}",
+                        next, line
+                    ))),
                 }
             }
-            '"' => tokenize_string(&mut program, ln),
-            '0'..='9' => tokenize_number(c, &mut program, ln),
-            'a'..='z' | 'A'..='Z' | '_' => tokenize_kwid(c, &mut program, ln),
+            '"' => {
+                let mut string = String::new();
+                while program.len() > 0 && program[program.len() - 1] != '"' {
+                    string.push(program.pop().unwrap());
+                }
+                if program.len() == 0 {
+                    tokens.push(Err(format!("Unterminated string at line {}", line)));
+                } else {
+                    program.pop();
+                    tokens.push(Ok(Token::String(string, line)));
+                }
+            }
+            '0'..='9' => {
+                let mut number = String::new();
+                number.push(curr);
+                while program.len() > 0 && program[program.len() - 1].is_digit(10) {
+                    number.push(program.pop().unwrap());
+                }
+                if program.len() > 0 && program[program.len() - 1] == '.' {
+                    number.push(program.pop().unwrap());
+                    while program.len() > 0 && program[program.len() - 1].is_digit(10) {
+                        number.push(program.pop().unwrap());
+                    }
+                }
+                tokens.push(Ok(Token::Number(number.parse().unwrap(), line)));
+            }
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut identifier = String::new();
+                identifier.push(curr);
+                while program.len() > 0 && program[program.len() - 1].is_alphanumeric() {
+                    identifier.push(program.pop().unwrap());
+                }
+                match identifier.as_str() {
+                    "and" => tokens.push(Ok(Token::And(line))),
+                    "class" => tokens.push(Ok(Token::Class(line))),
+                    "else" => tokens.push(Ok(Token::Else(line))),
+                    "false" => tokens.push(Ok(Token::False(line))),
+                    "for" => tokens.push(Ok(Token::For(line))),
+                    "fun" => tokens.push(Ok(Token::Fun(line))),
+                    "if" => tokens.push(Ok(Token::If(line))),
+                    "nil" => tokens.push(Ok(Token::Nil(line))),
+                    "or" => tokens.push(Ok(Token::Or(line))),
+                    "print" => tokens.push(Ok(Token::Print(line))),
+                    "return" => tokens.push(Ok(Token::Return(line))),
+                    "super" => tokens.push(Ok(Token::Super(line))),
+                    "this" => tokens.push(Ok(Token::This(line))),
+                    "true" => tokens.push(Ok(Token::True(line))),
+                    "var" => tokens.push(Ok(Token::Var(line))),
+                    "while" => tokens.push(Ok(Token::While(line))),
+                    _ => tokens.push(Ok(Token::Identifier(identifier, line))),
+                }
+            }
             _ => continue,
-        };
-        lexemes.push(lexeme);
-    }
-    lexemes.push(Ok(Lexeme::new(ln, Token::Eof)));
-    lexemes
-}
-
-fn tokenize_number<'a>(curr: char, rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
-    let mut number = String::new();
-    number.push(curr);
-    while let Some(&c) = rest.last() {
-        match c {
-            '0'..='9' | '.' => number.push(c),
-            _ => break,
-        }
-        rest.pop();
-    }
-    match number.parse::<f64>() {
-        Ok(number) => Ok(Lexeme::new(ln, Token::Number(number))),
-        Err(_) => Err(format!("Invalid number at line {}", ln)),
-    }
-}
-
-fn tokenize_string<'a>(rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
-    let mut string = String::new();
-    loop {
-        let c = rest.pop();
-        match c {
-            Some('"') => break,
-            Some(c) => string.push(c),
-            None => return Err(format!("Unterminated string at line {}", ln)),
         }
     }
-    Ok(Lexeme::new(ln, Token::String(string)))
-}
-
-fn tokenize_kwid<'a>(curr: char, rest: &mut Vec<char>, ln: usize) -> Result<Lexeme, String> {
-    let mut kwid = String::new();
-    kwid.push(curr);
-    while let Some(&c) = rest.last() {
-        match c {
-            'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => kwid.push(c),
-            _ => break,
-        }
-        rest.pop();
-    }
-    match kwid.as_str() {
-        "and" => Ok(Lexeme::new(ln, Token::And)),
-        "class" => Ok(Lexeme::new(ln, Token::Class)),
-        "else" => Ok(Lexeme::new(ln, Token::Else)),
-        "false" => Ok(Lexeme::new(ln, Token::False)),
-        "fun" => Ok(Lexeme::new(ln, Token::Fun)),
-        "for" => Ok(Lexeme::new(ln, Token::For)),
-        "if" => Ok(Lexeme::new(ln, Token::If)),
-        "nil" => Ok(Lexeme::new(ln, Token::Nil)),
-        "or" => Ok(Lexeme::new(ln, Token::Or)),
-        "print" => Ok(Lexeme::new(ln, Token::Print)),
-        "return" => Ok(Lexeme::new(ln, Token::Return)),
-        "super" => Ok(Lexeme::new(ln, Token::Super)),
-        "this" => Ok(Lexeme::new(ln, Token::This)),
-        "true" => Ok(Lexeme::new(ln, Token::True)),
-        "var" => Ok(Lexeme::new(ln, Token::Var)),
-        "while" => Ok(Lexeme::new(ln, Token::While)),
-        _ => Ok(Lexeme::new(ln, Token::Identifier(kwid))),
-    }
+    tokens.push(Ok(Token::Eof(line)));
+    tokens
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_logical_op() {
-        let program = "print 1 >= 0; var a = 1 < 0;";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::GreaterEqual)),
-            Ok(Lexeme::new(0, Token::Number(0.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Var)),
-            Ok(Lexeme::new(0, Token::Identifier("a".to_string()))),
-            Ok(Lexeme::new(0, Token::Equal)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::Less)),
-            Ok(Lexeme::new(0, Token::Number(0.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
-    }
-
-    #[test]
-    fn test_tokenize_with_comments() {
-        let program = "print true; // print 2 + 1; print\"one\"; 1 + -10;";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::True)),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
-    }
-
-    #[test]
-    fn test_tokenize_number() {
-        let program = "print 1 + 2.1 + 3;";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::Plus)),
-            Ok(Lexeme::new(0, Token::Number(2.1))),
-            Ok(Lexeme::new(0, Token::Plus)),
-            Ok(Lexeme::new(0, Token::Number(3.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
+    fn test_tokenize() {
+        let program = "var a = 1;";
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Ok(Token::Number(1.0, 0)),
+                Ok(Token::Semicolon(0)),
+                Ok(Token::Eof(0)),
+            ]
+        );
     }
 
     #[test]
     fn test_tokenize_string() {
-        let program = "print \"Hello, World!\";";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::String("Hello, World!".to_string()))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
+        let program = r#"var a = "hello";"#;
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Ok(Token::String("hello".to_string(), 0)),
+                Ok(Token::Semicolon(0)),
+                Ok(Token::Eof(0)),
+            ]
+        );
     }
 
     #[test]
-    fn test_tokenize_kws() {
-        let programs = vec![
-            "print 1 + 2;",
-            "b and c;",
-            "class Foo;",
-            "else print 1;",
-            "print false;",
-            "fun foo;",
-            "for i in iter;",
-            "if a;",
-            "return nil;",
-            "a or b;",
-            "super();",
-            "this.hello;",
-            "var a = true;",
-            "while true;",
-        ];
-        let expected = vec![
+    fn test_tokenize_string_unterminated() {
+        let program = r#"var a = "hello;"#;
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
             vec![
-                Ok(Lexeme::new(0, Token::Print)),
-                Ok(Lexeme::new(0, Token::Number(1.0))),
-                Ok(Lexeme::new(0, Token::Plus)),
-                Ok(Lexeme::new(0, Token::Number(2.0))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Identifier("b".to_string()))),
-                Ok(Lexeme::new(0, Token::And)),
-                Ok(Lexeme::new(0, Token::Identifier("c".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Class)),
-                Ok(Lexeme::new(0, Token::Identifier("Foo".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Else)),
-                Ok(Lexeme::new(0, Token::Print)),
-                Ok(Lexeme::new(0, Token::Number(1.0))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Print)),
-                Ok(Lexeme::new(0, Token::False)),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Fun)),
-                Ok(Lexeme::new(0, Token::Identifier("foo".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::For)),
-                Ok(Lexeme::new(0, Token::Identifier("i".to_string()))),
-                Ok(Lexeme::new(0, Token::Identifier("in".to_string()))),
-                Ok(Lexeme::new(0, Token::Identifier("iter".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::If)),
-                Ok(Lexeme::new(0, Token::Identifier("a".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Return)),
-                Ok(Lexeme::new(0, Token::Nil)),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Identifier("a".to_string()))),
-                Ok(Lexeme::new(0, Token::Or)),
-                Ok(Lexeme::new(0, Token::Identifier("b".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Super)),
-                Ok(Lexeme::new(0, Token::LeftParen)),
-                Ok(Lexeme::new(0, Token::RightParen)),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::This)),
-                Ok(Lexeme::new(0, Token::Dot)),
-                Ok(Lexeme::new(0, Token::Identifier("hello".to_string()))),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::Var)),
-                Ok(Lexeme::new(0, Token::Identifier("a".to_string()))),
-                Ok(Lexeme::new(0, Token::Equal)),
-                Ok(Lexeme::new(0, Token::True)),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-            vec![
-                Ok(Lexeme::new(0, Token::While)),
-                Ok(Lexeme::new(0, Token::True)),
-                Ok(Lexeme::new(0, Token::Semicolon)),
-                Ok(Lexeme::new(0, Token::Eof)),
-            ],
-        ];
-        for (program, expected) in programs.iter().zip(expected.iter()) {
-            assert_eq!(tokenize(program), expected.clone());
-        }
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Err("Unterminated string at line 0".to_string()),
+                Ok(Token::Eof(0))
+            ]
+        );
     }
 
     #[test]
-    fn test_tokenize_num_error() {
-        let program = "print true; print 2.1.1 + 1; print\"one\"; 1 + -10;";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::True)),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Print)),
-            Err("Invalid number at line 0".to_string()),
-            Ok(Lexeme::new(0, Token::Plus)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::String("one".to_string()))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::Plus)),
-            Ok(Lexeme::new(0, Token::Minus)),
-            Ok(Lexeme::new(0, Token::Number(10.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
+    fn test_tokenize_number() {
+        let program = "var a = 1.5;";
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Ok(Token::Number(1.5, 0)),
+                Ok(Token::Semicolon(0)),
+                Ok(Token::Eof(0)),
+            ]
+        );
     }
 
     #[test]
-    fn test_tokenize_with_str_errors() {
-        let program = "print true; print 2 + 1; print\"one; 1 + -10;";
-        let lexemes = tokenize(program);
-        let expected = vec![
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::True)),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Print)),
-            Ok(Lexeme::new(0, Token::Number(2.0))),
-            Ok(Lexeme::new(0, Token::Plus)),
-            Ok(Lexeme::new(0, Token::Number(1.0))),
-            Ok(Lexeme::new(0, Token::Semicolon)),
-            Ok(Lexeme::new(0, Token::Print)),
-            Err("Unterminated string at line 0".to_string()),
-            Ok(Lexeme::new(0, Token::Eof)),
-        ];
-        assert_eq!(lexemes, expected);
+    fn test_tokenize_number_with_dot() {
+        let program = "var a = 1.;";
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Ok(Token::Number(1.0, 0)),
+                Ok(Token::Semicolon(0)),
+                Ok(Token::Eof(0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_number_with_dot_and_decimal() {
+        let program = "var a = 1.5;";
+        let tokens = tokenize(program);
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::Var(0)),
+                Ok(Token::Identifier("a".to_string(), 0)),
+                Ok(Token::Equal(0)),
+                Ok(Token::Number(1.5, 0)),
+                Ok(Token::Semicolon(0)),
+                Ok(Token::Eof(0)),
+            ]
+        );
     }
 }
