@@ -1,5 +1,3 @@
-use lox_rs::interpret;
-
 fn main() {
     let lines = vec![
         "var a = 4;",
@@ -18,5 +16,5 @@ fn main() {
         "}",
     ];
     let program = lines.join("\n");
-    interpret(program);
+    // interpret(program);
 }
