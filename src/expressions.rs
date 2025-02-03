@@ -1,4 +1,4 @@
-use crate::{tokenizer::Token, Create, Enviorment, Eval, Object};
+use crate::{tokenizer::Token, Create, enviorment::Enviorment, Eval, Object};
 use std::fmt::Display;
 
 #[derive(PartialEq, Debug, Clone)]
