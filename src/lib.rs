@@ -4,9 +4,11 @@ mod tokenizer;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+type Fun = fn(Vec<Option<Object>>) -> Result<Option<Object>, String>;
+
 #[derive(Debug, Clone, PartialEq)]
 enum Object {
-    Function(String, usize, fn(Vec<Object>) -> Option<Object>),
+    Function(Fun, String, usize),
     Number(f64),
     String(String),
     Boolean(bool),
@@ -15,7 +17,7 @@ enum Object {
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Object::Function(name, _, _) => write!(f, "<fn {}>", name),
+            Object::Function(_, name, _) => write!(f, "<fn {}>", name),
             Object::Number(num) => write!(f, "{}", num),
             Object::String(s) => write!(f, "{}", s),
             Object::Boolean(b) => write!(f, "{}", b),
@@ -23,22 +25,32 @@ impl Display for Object {
     }
 }
 
+trait Eval {
+    type Output;
+    fn eval(&self, env: &mut Enviorment) -> Result<Self::Output, String>;
+}
+
+trait Create {
+    type Output;
+    fn create(tokens: &mut Vec<tokenizer::Token>) -> Result<Self::Output, String>;
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Enviorment {
     parent: Option<Box<Enviorment>>,
-    values: HashMap<String, Object>,
+    values: HashMap<String, Option<Object>>,
 }
 
 impl Enviorment {
-    fn define(&mut self, key: String, value: Object) {
+    fn define(&mut self, key: String, value: Option<Object>) {
         self.values.insert(key, value);
     }
 
-    fn assign(&mut self, key: String, value: Object) -> Result<Object, String> {
+    fn assign(&mut self, key: String, value: Option<Object>) -> Result<(), String> {
         if self.values.contains_key(&key) {
-            let prev = self.values.remove(&key);
+            let _ = self.values.remove(&key);
             self.values.insert(key, value);
-            Ok(prev.unwrap())
+            Ok(())
         } else {
             match &mut self.parent {
                 Some(parent) => parent.assign(key, value),
@@ -47,7 +59,7 @@ impl Enviorment {
         }
     }
 
-    fn get(&self, key: String) -> Result<Object, String> {
+    fn get(&self, key: String) -> Result<Option<Object>, String> {
         if self.values.contains_key(&key) {
             Ok(self.values.get(&key).unwrap().clone())
         } else {

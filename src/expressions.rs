@@ -1,4 +1,4 @@
-use crate::{tokenizer::Token, Enviorment, Object};
+use crate::{tokenizer::Token, Create, Enviorment, Eval, Object};
 use std::fmt::Display;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -92,26 +92,187 @@ impl Display for Expression {
     }
 }
 
-impl TryFrom<Vec<Token>> for Expression {
-    type Error = String;
-    fn try_from(tokens: Vec<Token>) -> Result<Self, Self::Error> {
-        let mut tokens: Vec<Token> = tokens.iter().cloned().rev().collect();
-        produce_expression(&mut tokens)
+impl Eval for Expression {
+    type Output = Option<Object>;
+    fn eval(&self, env: &mut Enviorment) -> Result<Self::Output, String> {
+        match self {
+            Self::Literal(obj) => Ok(obj.clone()),
+            Self::Grouping(expr) => expr.eval(env),
+            Self::Variable(name) => Ok(env.get(name.clone())?),
+            Self::Assignment(name, expr) => eval_assignment_expr(name, expr, env),
+            Self::Unary(op, expr) => eval_unary_expr(op, expr, env),
+            Self::Binary(left, op, right) => eval_binary_expr(op, left, right, env),
+            Self::Logical(left, op, right) => eval_logical_expr(left, op, right, env),
+            Self::Call(callee, args) => eval_call_expr(callee, args, env),
+        }
     }
 }
 
-impl Expression {
-    pub fn eval(&self, env: &mut Enviorment) -> Result<Option<Object>, String> {
-        match self {
-            Self::Literal(obj) => todo!(),
-            Self::Unary(op, expr) => todo!(),
-            Self::Binary(left, op, right) => todo!(),
-            Self::Grouping(expr) => todo!(),
-            Self::Variable(name) => todo!(),
-            Self::Assignment(name, expr) => todo!(),
-            Self::Logical(left, op, right) => todo!(),
-            Self::Call(callee, args) => todo!(),
+impl Create for Expression {
+    type Output = Expression;
+    fn create(tokens: &mut Vec<Token>) -> Result<Self::Output, String> {
+        let mut tkns = tokens.iter().cloned().rev().collect();
+        let expr = produce_expression(&mut tkns);
+        *tokens = tkns.iter().cloned().rev().collect();
+        expr
+    }
+}
+
+fn eval_unary_expr(
+    op: &UnaryOp,
+    expr: &Expression,
+    env: &mut Enviorment,
+) -> Result<Option<Object>, String> {
+    let obj = expr.eval(env)?;
+    match op {
+        UnaryOp::Minus => match obj {
+            Some(Object::Number(num)) => Ok(Some(Object::Number(-num))),
+            _ => Err(format!("Unary '-' expects a number, got {:?}", obj)),
+        },
+        UnaryOp::Bang => match obj {
+            Some(Object::Boolean(b)) => Ok(Some(Object::Boolean(!b))),
+            _ => Err(format!("Unary '!' expects a boolean, got {:?}", obj)),
+        },
+    }
+}
+
+fn eval_binary_expr(
+    op: &BinaryOp,
+    left: &Expression,
+    right: &Expression,
+    env: &mut Enviorment,
+) -> Result<Option<Object>, String> {
+    let left = left
+        .eval(env)?
+        .ok_or_else(|| String::from("Left operand is nil"))?;
+    let right = right
+        .eval(env)?
+        .ok_or_else(|| String::from("Right operand is nil"))?;
+    match op {
+        BinaryOp::Plus => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Number(l + r))),
+            (Object::String(l), Object::String(r)) => {
+                Ok(Some(Object::String(format!("{}{}", l, r))))
+            }
+            _ => Err(format!(
+                "Binary '+' expects two numbers or two strings, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::Minus => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Number(l - r))),
+            _ => Err(format!(
+                "Binary '-' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::Star => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Number(l * r))),
+            _ => Err(format!(
+                "Binary '*' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::Slash => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Number(l / r))),
+            _ => Err(format!(
+                "Binary '/' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::Greater => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Boolean(l > r))),
+            _ => Err(format!(
+                "Binary '>' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::GreaterEqual => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Boolean(l >= r))),
+            _ => Err(format!(
+                "Binary '>=' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::Less => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Boolean(l < r))),
+            _ => Err(format!(
+                "Binary '<' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::LessEqual => match (&left, &right) {
+            (Object::Number(l), Object::Number(r)) => Ok(Some(Object::Boolean(l <= r))),
+            _ => Err(format!(
+                "Binary '<=' expects two numbers, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        BinaryOp::EqualEqual => Ok(Some(Object::Boolean(left == right))),
+        BinaryOp::BangEqual => Ok(Some(Object::Boolean(left != right))),
+    }
+}
+
+fn eval_call_expr(
+    callee: &Expression,
+    args: &Vec<Expression>,
+    env: &mut Enviorment,
+) -> Result<Option<Object>, String> {
+    let callee = callee.eval(env)?;
+    let mut args_values = vec![];
+    for arg in args {
+        args_values.push(arg.eval(env)?);
+    }
+
+    match callee {
+        Some(Object::Function(fun, _, arity)) => {
+            if args.len() != arity {
+                return Err(format!("Expected {} arguments, got {}", arity, args.len()));
+            }
+            fun(args_values)
         }
+        Some(obj) => Err(format!("{} is not a function", obj)),
+        None => Err(String::from("Callee is nil")),
+    }
+}
+
+fn eval_assignment_expr(
+    name: &str,
+    expr: &Expression,
+    env: &mut Enviorment,
+) -> Result<Option<Object>, String> {
+    let value = expr.eval(env)?;
+    env.assign(name.to_string(), value.clone())?;
+    Ok(value)
+}
+
+fn eval_logical_expr(
+    left: &Expression,
+    op: &LogicalOp,
+    right: &Expression,
+    env: &mut Enviorment,
+) -> Result<Option<Object>, String> {
+    let left = left.eval(env)?;
+    let right = right.eval(env)?;
+    match op {
+        LogicalOp::And => match (&left, &right) {
+            (Some(Object::Boolean(l)), Some(Object::Boolean(r))) => {
+                Ok(Some(Object::Boolean(*l && *r)))
+            }
+            _ => Err(format!(
+                "Logical 'and' expects two booleans, got {:?} and {:?}",
+                left, right
+            )),
+        },
+        LogicalOp::Or => match (&left, &right) {
+            (Some(Object::Boolean(l)), Some(Object::Boolean(r))) => {
+                Ok(Some(Object::Boolean(*l || *r)))
+            }
+            _ => Err(format!(
+                "Logical 'or' expects two booleans, got {:?} and {:?}",
+                left, right
+            )),
+        },
     }
 }
 
@@ -173,10 +334,10 @@ fn produce_equality(tokens: &mut Vec<Token>) -> Result<Expression, String> {
 
 fn produce_comparison(tokens: &mut Vec<Token>) -> Result<Expression, String> {
     let mut expr = produce_term(tokens)?;
-    while let Some(Token::Greater(line))
-    | Some(Token::GreaterEqual(line))
-    | Some(Token::Less(line))
-    | Some(Token::LessEqual(line)) = tokens.last()
+    while let Some(Token::Greater(_))
+    | Some(Token::GreaterEqual(_))
+    | Some(Token::Less(_))
+    | Some(Token::LessEqual(_)) = tokens.last()
     {
         let op = match tokens.pop().unwrap() {
             Token::Greater(_) => BinaryOp::Greater,
@@ -285,11 +446,11 @@ mod test {
     #[test]
     fn test_produce_arithmetic_expression() {
         let program = "1 + 2 * 3;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
             Expression::Binary(
@@ -307,71 +468,72 @@ mod test {
     #[test]
     fn test_produce_logical_expression() {
         let program = "true and false or true;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
             Expression::Logical(
                 Box::new(Expression::Logical(
                     Box::new(Expression::Literal(Some(Object::Boolean(true)))),
                     LogicalOp::And,
-                    Box::new(Expression::Literal(Some(Object::Boolean(false)))
-                    )
+                    Box::new(Expression::Literal(Some(Object::Boolean(false))))
                 )),
                 LogicalOp::Or,
-                Box::new(Expression::Literal(Some(Object::Boolean(true)))
+                Box::new(Expression::Literal(Some(Object::Boolean(true))))
             )
-        ));
+        );
     }
 
     #[test]
     fn test_produce_grouped_expression() {
         let program = "(1 + 2) * 3;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
             Expression::Binary(
                 Box::new(Expression::Grouping(Box::new(Expression::Binary(
                     Box::new(Expression::Literal(Some(Object::Number(1.0)))),
                     BinaryOp::Plus,
-                    Box::new(Expression::Literal(Some(Object::Number(2.0)))
-                    )
+                    Box::new(Expression::Literal(Some(Object::Number(2.0))))
                 )))),
                 BinaryOp::Star,
-                Box::new(Expression::Literal(Some(Object::Number(3.0)))
+                Box::new(Expression::Literal(Some(Object::Number(3.0))))
             )
-        ));
+        );
     }
 
     #[test]
     fn test_produce_assignment_expression() {
         let program = "a = 1;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
-            Expression::Assignment("a".to_string(), Box::new(Expression::Literal(Some(Object::Number(1.0))))
-        ));
+            Expression::Assignment(
+                "a".to_string(),
+                Box::new(Expression::Literal(Some(Object::Number(1.0))))
+            )
+        );
     }
 
     #[test]
     fn test_produce_call_expression() {
         let program = "foo(1, 2);";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
             Expression::Call(
@@ -387,28 +549,99 @@ mod test {
     #[test]
     fn test_produce_unary_expression() {
         let program = "-1;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
-            Expression::Unary(UnaryOp::Minus, Box::new(Expression::Literal(Some(Object::Number(1.0))))
-        ));
+            Expression::Unary(
+                UnaryOp::Minus,
+                Box::new(Expression::Literal(Some(Object::Number(1.0))))
+            )
+        );
     }
 
     #[test]
     fn test_produce_logical_not_expression() {
         let program = "!true;";
-        let tokens: Vec<Token> = tokenize(program)
+        let mut tokens: Vec<Token> = tokenize(program)
             .iter()
             .map(|t| t.clone().unwrap())
             .collect();
-        let expr = Expression::try_from(tokens).unwrap();
+        let expr = Expression::create(&mut tokens).unwrap();
         assert_eq!(
             expr,
-            Expression::Unary(UnaryOp::Bang, Box::new(Expression::Literal(Some(Object::Boolean(true))))
-        ));
+            Expression::Unary(
+                UnaryOp::Bang,
+                Box::new(Expression::Literal(Some(Object::Boolean(true))))
+            )
+        );
+    }
+    #[test]
+    fn test_eval_literal() {
+        let expr = Expression::Literal(Some(Object::Number(1.0)));
+        let mut env = Enviorment::default();
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(1.0)));
+    }
+
+    #[test]
+    fn test_eval_grouping() {
+        let expr = Expression::Grouping(Box::new(Expression::Literal(Some(Object::Number(1.0)))));
+        let mut env = Enviorment::default();
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(1.0)));
+    }
+
+    #[test]
+    fn test_eval_variable() {
+        let expr = Expression::Variable("a".to_string());
+        let mut env = Enviorment::default();
+        env.define("a".to_string(), Some(Object::Number(1.0)));
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(1.0)));
+    }
+
+    #[test]
+    fn test_eval_assignment() {
+        let expr = Expression::Assignment(
+            "a".to_string(),
+            Box::new(Expression::Literal(Some(Object::Number(1.0)))),
+        );
+        let mut env = Enviorment::default();
+        env.define("a".to_string(), Some(Object::Number(10.0)));
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(1.0)));
+        assert_eq!(env.get("a".to_string()).unwrap(), Some(Object::Number(1.0)));
+    }
+
+    #[test]
+    fn test_eval_unary() {
+        let expr = Expression::Unary(
+            UnaryOp::Minus,
+            Box::new(Expression::Literal(Some(Object::Number(1.0)))),
+        );
+        let mut env = Enviorment::default();
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(-1.0)));
+    }
+
+    #[test]
+    fn test_eval_binary() {
+        let expr = Expression::Binary(
+            Box::new(Expression::Literal(Some(Object::Number(1.0)))),
+            BinaryOp::Plus,
+            Box::new(Expression::Literal(Some(Object::Number(2.0)))),
+        );
+        let mut env = Enviorment::default();
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Number(3.0)));
+    }
+
+    #[test]
+    fn test_eval_logical() {
+        let expr = Expression::Logical(
+            Box::new(Expression::Literal(Some(Object::Boolean(true)))),
+            LogicalOp::And,
+            Box::new(Expression::Literal(Some(Object::Boolean(false)))),
+        );
+        let mut env = Enviorment::default();
+        assert_eq!(expr.eval(&mut env).unwrap(), Some(Object::Boolean(false)));
     }
 }
