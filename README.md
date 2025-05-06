@@ -2,7 +2,7 @@
 
 Implementation of JLox from Robert Nystrom's book [Crafting Interpreters](https://craftinginterpreters.com/) using Rust. This projects follows each chapter in the book but instead of using Java, it implements JLox using Rust instead. The project also focuses on using Rust patterns instead of common programming patterns that belong to Java.
 
-I'm following Jon Gjengset's implementation of lox and the main focus of this projects is to increase my exposure to Rust and also see how someone with more Rust experience would implement lox.
+I'm following Jon Gjengset's implementation of lox and the main focus of this projects is to increase my exposure to Rust and also see how someone with more Rust experience would implement lox. Rust Programming takes a bit to get used to especially the ownership system and lifetimes, so following Jon Gjengset implementation should give me some insight on how to think when programming in Rust.
 
 ## What's JLox?
 
